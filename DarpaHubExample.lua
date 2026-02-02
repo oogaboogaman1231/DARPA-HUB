@@ -1,262 +1,168 @@
--- ============================================================
---   DARPA HUB FOR BLOXSTRIKE (FIXED & IMPROVED)
---   Aimbot Avançado, ESP Completo e Fixes de Interface
--- ============================================================
+local Hub = loadstring(game:HttpGet("https://raw.githubusercontent.com/SEUUSUARIO/DarpaHub/main/DarpaHubLib.lua"))()
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Workspace = game:GetService("Workspace")
-local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
+local UIS = game:GetService("UserInputService")
+local LocalPlayer = game.Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
--- Load Library
-local DarpaHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/oogaboogaman1231/DARPA-HUB/refs/heads/main/DarpaHubLib.lua"))()
+-- ======================================
+-- AIMBOT ENGINE
+-- ======================================
 
--- ──────────────────────────────────────────────────────────
---  AIMBOT SETTINGS
--- ──────────────────────────────────────────────────────────
-local Aimbot = {
-	Enabled = false,
-	WallCheck = true,
-	ShowFOV = false,
-	FOV = 100,
-	Smoothness = 5,
-	Key = Enum.UserInputType.MouseButton2, -- Padrão (Right Click)
-	TargetPart = "Head",
-	CurrentTarget = nil
-}
+Hub:RegisterFeature("Aimbot", {
+    Config = {
+        FOV = 220,
+        Smooth = 0.12,
+        Rage = false
+    },
 
--- FOV Circle Drawing
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Color = Color3.fromRGB(0, 210, 255)
-FOVCircle.Thickness = 1
-FOVCircle.NumSides = 60
-FOVCircle.Radius = Aimbot.FOV
-FOVCircle.Visible = false
-FOVCircle.Filled = false
-FOVCircle.Transparency = 1
+    Update = function(cfg)
+        local target = Hub:GetClosestTarget(cfg.FOV)
+        if not target then return end
 
--- ──────────────────────────────────────────────────────────
---  UI SETUP
--- ──────────────────────────────────────────────────────────
-local Window = DarpaHub:CreateWindow("Bloxstrike Hub v2.0")
+        local cf = CFrame.new(Camera.CFrame.Position, target.Position)
 
-local CombatTab = Window:AddTab("Combat")
-local VisualTab = Window:AddTab("Visuals")
-local PlayerTab = Window:AddTab("Players")
-local MiscTab = Window:AddTab("Misc")
+        if cfg.Rage then
+            Camera.CFrame = cf
+        else
+            Camera.CFrame = Camera.CFrame:Lerp(cf, cfg.Smooth)
+        end
+    end
+})
 
--- ──────────────────────────────────────────────────────────
---  COMBAT TAB
--- ──────────────────────────────────────────────────────────
+-- ======================================
+-- SILENT AIM VIA HOOK
+-- ======================================
 
-CombatTab:AddToggle("Enable Aimbot", false, function(v)
-	Aimbot.Enabled = v
+Hub:CreateHook("BulletDirection")
+
+Hub:RegisterFeature("SilentAim", {
+    Start = function()
+        Hub:HookMain("BulletDirection", function(dir)
+            local t = Hub:GetClosestTarget(250)
+            if t then
+                return (t.Position - Camera.CFrame.Position).Unit
+            end
+            return dir
+        end)
+    end
+})
+
+-- ======================================
+-- FULL ESP SYSTEM
+-- ======================================
+
+local ESP = {}
+
+Hub:RegisterFeature("ESP", {
+    Start = function()
+        for _,e in ipairs(Hub:GetEnemies()) do
+            ESP[e] = {
+                Box = Hub.Drawing:Box(),
+                Name = Hub.Drawing:Text()
+            }
+        end
+    end,
+
+    Stop = function()
+        for _,v in pairs(ESP) do
+            v.Box:Remove()
+            v.Name:Remove()
+        end
+        ESP = {}
+    end,
+
+    Update = function()
+        for plr,data in pairs(ESP) do
+            if not plr.Character then continue end
+            local hrp = plr.Character.HumanoidRootPart
+
+            local pos,vis,depth = Hub:WorldToScreen(hrp.Position)
+
+            if vis then
+                local size = math.clamp(2200/depth,25,160)
+
+                data.Box.Size = Vector2.new(size,size*1.6)
+                data.Box.Position = pos - data.Box.Size/2
+                data.Box.Visible = true
+
+                data.Name.Text = plr.Name
+                data.Name.Position = pos - Vector2.new(0,size)
+                data.Name.Visible = true
+            else
+                data.Box.Visible = false
+                data.Name.Visible = false
+            end
+        end
+    end
+})
+
+-- ======================================
+-- TRIGGERBOT
+-- ======================================
+
+Hub:RegisterFeature("Triggerbot", {
+    Update = function()
+        local t = Hub:GetClosestTarget(35)
+        if t then
+            mouse1press()
+            task.wait(0.01)
+            mouse1release()
+        end
+    end
+})
+
+-- ======================================
+-- HITBOX EXPANDER
+-- ======================================
+
+Hub:RegisterFeature("Hitbox", {
+    Config = { Size = 7 },
+
+    Update = function(cfg)
+        for _,e in ipairs(Hub:GetEnemies()) do
+            local hrp = e.Character.HumanoidRootPart
+            hrp.Size = Vector3.new(cfg.Size,cfg.Size,cfg.Size)
+            hrp.Transparency = 0.5
+            hrp.CanCollide = false
+        end
+    end
+})
+
+-- ======================================
+-- MOVEMENT ENGINE
+-- ======================================
+
+Hub:RegisterFeature("Speed", {
+    Config = { Value = 40 },
+    Update = function(cfg)
+        local h = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+        if h then h.WalkSpeed = cfg.Value end
+    end
+})
+
+Hub:RegisterFeature("Bhop", {
+    Update = function()
+        local h = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+        if h and h.FloorMaterial ~= Enum.Material.Air then
+            h:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+})
+
+-- ======================================
+-- HOTKEY SYSTEM
+-- ======================================
+
+UIS.InputBegan:Connect(function(i,gp)
+    if gp then return end
+
+    if i.KeyCode == Enum.KeyCode.F then Hub:Set("Aimbot") end
+    if i.KeyCode == Enum.KeyCode.G then Hub:Set("ESP") end
+    if i.KeyCode == Enum.KeyCode.H then Hub:Set("SilentAim") end
+    if i.KeyCode == Enum.KeyCode.J then Hub:Set("Triggerbot") end
+    if i.KeyCode == Enum.KeyCode.K then Hub:Set("Hitbox") end
+    if i.KeyCode == Enum.KeyCode.L then Hub:Set("Speed") end
+    if i.KeyCode == Enum.KeyCode.B then Hub:Set("Bhop") end
 end)
 
-CombatTab:AddDropdown("Aim Key", {"Right Mouse", "Left Mouse", "E", "Q", "Left Alt"}, "Right Mouse", function(selected)
-	if selected == "Right Mouse" then Aimbot.Key = Enum.UserInputType.MouseButton2
-	elseif selected == "Left Mouse" then Aimbot.Key = Enum.UserInputType.MouseButton1
-	elseif selected == "E" then Aimbot.Key = Enum.KeyCode.E
-	elseif selected == "Q" then Aimbot.Key = Enum.KeyCode.Q
-	elseif selected == "Left Alt" then Aimbot.Key = Enum.KeyCode.LeftAlt
-	end
-end)
-
-CombatTab:AddToggle("Wall Check", true, function(v)
-	Aimbot.WallCheck = v
-end)
-
-CombatTab:AddSlider("Aimbot FOV", 10, 400, 100, function(v)
-	Aimbot.FOV = v
-	FOVCircle.Radius = v
-end)
-
-CombatTab:AddToggle("Show FOV Circle", false, function(v)
-	Aimbot.ShowFOV = v
-	FOVCircle.Visible = v
-end)
-
-CombatTab:AddSlider("Smoothness", 1, 20, 5, function(v)
-	Aimbot.Smoothness = v
-end)
-
-CombatTab:AddDropdown("Target Part", {"Head", "Torso"}, "Head", function(v)
-	Aimbot.TargetPart = v
-end)
-
--- ──────────────────────────────────────────────────────────
---  VISUALS TAB
--- ──────────────────────────────────────────────────────────
-
-VisualTab:AddToggle("Master ESP", false, function(v)
-	DarpaHub.ESP:Toggle(v)
-end)
-
-VisualTab:AddToggle("Boxes", true, function(v)
-	DarpaHub.ESP.Settings.Box = v
-end)
-
-VisualTab:AddToggle("Health Bar", true, function(v)
-	DarpaHub.ESP.Settings.HealthBar = v
-end)
-
-VisualTab:AddToggle("Tracers", false, function(v)
-	DarpaHub.ESP.Settings.Tracers = v
-end)
-
-VisualTab:AddToggle("Names", true, function(v)
-	DarpaHub.ESP.Settings.Name = v
-end)
-
-VisualTab:AddToggle("Distance", true, function(v)
-	DarpaHub.ESP.Settings.Distance = v
-end)
-
-VisualTab:AddToggle("Team Check", true, function(v)
-	DarpaHub.ESP.Settings.TeamCheck = v
-end)
-
-VisualTab:AddSlider("Camera FOV", 70, 120, 70, function(v)
-	Camera.FieldOfView = v
-end)
-
--- ──────────────────────────────────────────────────────────
---  PLAYER TAB (Fixed Dropdown)
--- ──────────────────────────────────────────────────────────
-
-local playerList = {}
-local selectedPlayerName = nil
-
-local function RefreshPlayerList()
-	playerList = {}
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p ~= LocalPlayer then
-			table.insert(playerList, p.Name)
-		end
-	end
-	if #playerList == 0 then table.insert(playerList, "No Players") end
-	return playerList
-end
-
-local PlayerDropdown = PlayerTab:AddDropdown("Select Player", RefreshPlayerList(), "None", function(name)
-	selectedPlayerName = name
-end)
-
-PlayerTab:AddButton("Refresh List", function()
-	PlayerDropdown.Refresh(RefreshPlayerList())
-end)
-
-PlayerTab:AddButton("Teleport to Player", function()
-	if selectedPlayerName and selectedPlayerName ~= "No Players" then
-		local target = Players:FindFirstChild(selectedPlayerName)
-		if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-			LocalPlayer.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame
-		end
-	end
-end)
-
--- ──────────────────────────────────────────────────────────
---  MISC TAB
--- ──────────────────────────────────────────────────────────
-
-MiscTab:AddButton("Reset Character", function()
-	if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-		LocalPlayer.Character.Humanoid.Health = 0
-	end
-end)
-
-MiscTab:AddButton("Fullbright", function()
-	game.Lighting.Brightness = 2
-	game.Lighting.ClockTime = 14
-	game.Lighting.FogEnd = 100000
-	game.Lighting.GlobalShadows = false
-end)
-
-MiscTab:AddButton("Unload UI", function()
-	FOVCircle:Remove()
-	DarpaHub.ESP:Toggle(false)
-	Window.Screen:Destroy()
-end)
-
--- ──────────────────────────────────────────────────────────
---  AIMBOT LOGIC
--- ──────────────────────────────────────────────────────────
-
-local function IsVisible(targetPart)
-	if not Aimbot.WallCheck then return true end
-	local origin = Camera.CFrame.Position
-	local direction = (targetPart.Position - origin).Unit * (targetPart.Position - origin).Magnitude
-	
-	local params = RaycastParams.new()
-	params.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	
-	local result = Workspace:Raycast(origin, direction, params)
-	return result == nil or result.Instance:IsDescendantOf(targetPart.Parent)
-end
-
-local function GetClosestPlayer()
-	local closest = nil
-	local shortestDist = Aimbot.FOV
-	local mousePos = UserInputService:GetMouseLocation()
-
-	for _, player in ipairs(Players:GetPlayers()) do
-		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-			-- Team Check
-			if player.Team == LocalPlayer.Team and #Players:GetTeams() > 1 then
-				continue 
-			end
-
-			local part = player.Character:FindFirstChild(Aimbot.TargetPart)
-			if part then
-				local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
-				if onScreen then
-					local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-					if dist < shortestDist then
-						if IsVisible(part) then
-							shortestDist = dist
-							closest = part
-						end
-					end
-				end
-			end
-		end
-	end
-	return closest
-end
-
--- Render Loop for FOV Circle
-RunService.RenderStepped:Connect(function()
-	FOVCircle.Position = UserInputService:GetMouseLocation()
-	
-	if Aimbot.Enabled and Aimbot.CurrentTarget then
-		-- Aim Logic
-		local currentPos = Camera.CFrame.Position
-		local targetPos = Aimbot.CurrentTarget.Position
-		
-		-- Smoothness calculation
-		local targetCFrame = CFrame.new(currentPos, targetPos)
-		Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, 1 / Aimbot.Smoothness)
-	end
-end)
-
--- Input Handling
-UserInputService.InputBegan:Connect(function(input)
-	if not Aimbot.Enabled then return end
-	if input.UserInputType == Aimbot.Key or input.KeyCode == Aimbot.Key then
-		local target = GetClosestPlayer()
-		if target then
-			Aimbot.CurrentTarget = target
-		end
-	end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-	if input.UserInputType == Aimbot.Key or input.KeyCode == Aimbot.Key then
-		Aimbot.CurrentTarget = nil
-	end
-end)
-
-print("DarpaHub Bloxstrike Loaded!")
+print("🔥 DarpaHub BloxStrike paid-tier loaded.")
