@@ -1333,4 +1333,741 @@ end
 DarpaHub:GetSafeAPI().Visibility = Visibility
 getgenv().DarpaHubVisibility = Visibility
 
+-- ===============================
+-- DARPAHUB AIM CORE ENGINE
+-- ===============================
+
+DarpaHub.Aim = {}
+DarpaHub.Aim.__index = DarpaHub.Aim
+
+DarpaHub.Aim.Settings = {
+    Prediction = true,
+    PredictionFactor = 0.13,
+    Smoothness = 0.18,
+    MaxDistance = 2000
+}
+
+-- ===============================
+-- BONE TARGETING
+-- ===============================
+
+DarpaHub.Aim.Bones = {
+    Head = "Head",
+    Torso = "HumanoidRootPart",
+    Chest = "UpperTorso"
+}
+
+function DarpaHub.Aim:GetBone(character, priority)
+    for _, bone in ipairs(priority) do
+        local part = character:FindFirstChild(bone)
+        if part then return part end
+    end
+    return character:FindFirstChild("HumanoidRootPart")
+end
+
+-- ===============================
+-- VELOCITY EXTRACTION
+-- ===============================
+
+function DarpaHub.Aim:GetVelocity(part)
+    if part and part:IsA("BasePart") then
+        return part.AssemblyLinearVelocity or part.Velocity
+    end
+    return Vector3.zero
+end
+
+-- ===============================
+-- PREDICTION ENGINE
+-- ===============================
+
+function DarpaHub.Aim:PredictPosition(part, factor)
+    factor = factor or self.Settings.PredictionFactor
+    local vel = self:GetVelocity(part)
+    return part.Position + (vel * factor)
+end
+
+-- ===============================
+-- SMOOTH AIM CURVE
+-- ===============================
+
+function DarpaHub.Aim:Lerp(current, target, alpha)
+    return current + (target - current) * alpha
+end
+
+function DarpaHub.Aim:SmoothCFrame(current, target)
+    return current:Lerp(target, self.Settings.Smoothness)
+end
+
+-- ===============================
+-- HITBOX RESOLVER
+-- ===============================
+
+function DarpaHub.Aim:ResolveTarget(character)
+    if not character then return nil end
+
+    local bone = self:GetBone(character, {
+        self.Bones.Head,
+        self.Bones.Chest,
+        self.Bones.Torso
+    })
+
+    if not bone then return nil end
+
+    if self.Settings.Prediction then
+        return self:PredictPosition(bone)
+    end
+
+    return bone.Position
+end
+
+-- ===============================
+-- SAFE EXPORT
+-- ===============================
+
+DarpaHub:GetSafeAPI().Aim = DarpaHub.Aim
+getgenv().DarpaHubAim = DarpaHub.Aim
+
+-- ===============================
+-- DARPAHUB BALLISTICS ENGINE
+-- ===============================
+
+DarpaHub.Ballistics = {}
+
+DarpaHub.Ballistics.Gravity = workspace.Gravity or 196.2
+
+function DarpaHub.Ballistics:TimeToTarget(origin, target, speed)
+    return (target - origin).Magnitude / speed
+end
+
+function DarpaHub.Ballistics:PredictWithDrop(origin, part, speed)
+    local vel = part.AssemblyLinearVelocity or Vector3.zero
+    local distance = (part.Position - origin).Magnitude
+    local time = distance / speed
+
+    local gravityDrop = Vector3.new(0, -0.5 * self.Gravity * time * time, 0)
+    local movement = vel * time
+
+    return part.Position + movement + gravityDrop
+end
+
+function DarpaHub.Ballistics:LinearExtrapolation(part, time)
+    return part.Position + (part.AssemblyLinearVelocity * time)
+end
+
+DarpaHub:GetSafeAPI().Ballistics = DarpaHub.Ballistics
+getgenv().DarpaHubBallistics = DarpaHub.Ballistics
+
+-- ===============================
+-- DARPAHUB UI ANIMATION ENGINE
+-- ===============================
+
+DarpaHub.Animations = {}
+
+local TweenService = game:GetService("TweenService")
+
+DarpaHub.Animations.Presets = {
+    Fast = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+    Smooth = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+    Elastic = TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+    SlowFade = TweenInfo.new(0.6, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+}
+
+function DarpaHub.Animations:Tween(obj, preset, props)
+    local info = self.Presets[preset] or self.Presets.Smooth
+    local tween = TweenService:Create(obj, info, props)
+    tween:Play()
+    return tween
+end
+
+function DarpaHub.Animations:FadeIn(obj, time)
+    obj.Visible = true
+    obj.BackgroundTransparency = 1
+    TweenService:Create(obj, TweenInfo.new(time or 0.25), {
+        BackgroundTransparency = 0
+    }):Play()
+end
+
+function DarpaHub.Animations:FadeOut(obj, time)
+    local tween = TweenService:Create(obj, TweenInfo.new(time or 0.25), {
+        BackgroundTransparency = 1
+    })
+    tween:Play()
+    tween.Completed:Connect(function()
+        obj.Visible = false
+    end)
+end
+
+function DarpaHub.Animations:Pop(obj)
+    local original = obj.Size
+    obj.Size = UDim2.new(original.X.Scale, original.X.Offset * 0.8, original.Y.Scale, original.Y.Offset * 0.8)
+
+    TweenService:Create(obj, self.Presets.Elastic, {
+        Size = original
+    }):Play()
+end
+
+function DarpaHub.Animations:SlideIn(obj, fromOffset)
+    local target = obj.Position
+    obj.Position = target + fromOffset
+    TweenService:Create(obj, self.Presets.Smooth, {
+        Position = target
+    }):Play()
+end
+
+function DarpaHub.Animations:Hover(button, scale)
+    scale = scale or 1.05
+    local base = button.Size
+
+    button.MouseEnter:Connect(function()
+        TweenService:Create(button, self.Presets.Fast, {
+            Size = UDim2.new(base.X.Scale, base.X.Offset * scale, base.Y.Scale, base.Y.Offset * scale)
+        }):Play()
+    end)
+
+    button.MouseLeave:Connect(function()
+        TweenService:Create(button, self.Presets.Fast, {
+            Size = base
+        }):Play()
+    end)
+end
+
+DarpaHub:GetSafeAPI().Animations = DarpaHub.Animations
+getgenv().DarpaHubAnimations = DarpaHub.Animations
+
+-- ===============================
+-- DARPAHUB TARGET SELECTOR
+-- ===============================
+
+DarpaHub.Targeting = {}
+
+DarpaHub.Targeting.Settings = {
+    MaxDistance = 2000,
+    FOV = 350,
+    PrioritizeVisible = true,
+    PrioritizeClosest = true
+}
+
+function DarpaHub.Targeting:GetTargets()
+    local list = {}
+    for _, plr in ipairs(game.Players:GetPlayers()) do
+        if plr ~= game.Players.LocalPlayer and plr.Character then
+            local root = plr.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                table.insert(list, root)
+            end
+        end
+    end
+    return list
+end
+
+function DarpaHub.Targeting:ScreenDistance(pos)
+    local screen, on = DarpaHub.Render:WorldToScreen(pos)
+    if not on then return math.huge end
+    local mouse = game:GetService("UserInputService"):GetMouseLocation()
+    return (screen - mouse).Magnitude
+end
+
+function DarpaHub.Targeting:SelectBest()
+    local cam = workspace.CurrentCamera
+    local best, bestScore = nil, math.huge
+
+    for _, part in ipairs(self:GetTargets()) do
+        local dist = (cam.CFrame.Position - part.Position).Magnitude
+        if dist < self.Settings.MaxDistance then
+            local screenDist = self:ScreenDistance(part.Position)
+            if screenDist < self.Settings.FOV then
+                local score = screenDist + dist * 0.01
+                if score < bestScore then
+                    bestScore = score
+                    best = part
+                end
+            end
+        end
+    end
+
+    return best
+end
+
+DarpaHub:GetSafeAPI().Targeting = DarpaHub.Targeting
+getgenv().DarpaHubTargeting = DarpaHub.Targeting
+
+-- ===============================
+-- DARPAHUB ENTITY CACHE
+-- ===============================
+
+DarpaHub.EntityCache = {
+    Players = {},
+    LastUpdate = 0,
+    Interval = 1
+}
+
+function DarpaHub.EntityCache:Refresh()
+    self.Players = {}
+    for _, plr in ipairs(game.Players:GetPlayers()) do
+        if plr.Character then
+            table.insert(self.Players, plr.Character)
+        end
+    end
+end
+
+DarpaHub._private.Scheduler:AddJob(function()
+    DarpaHub.EntityCache:Refresh()
+end,{interval = DarpaHub.EntityCache.Interval})
+
+DarpaHub:GetSafeAPI().EntityCache = DarpaHub.EntityCache
+getgenv().DarpaHubEntityCache = DarpaHub.EntityCache
+
+-- ===============================
+-- DARPAHUB SKELETON RENDER
+-- ===============================
+
+DarpaHub.Skeleton = {}
+
+DarpaHub.Skeleton.Bones = {
+    {"Head","UpperTorso"},
+    {"UpperTorso","LowerTorso"},
+    {"UpperTorso","LeftUpperArm"},
+    {"LeftUpperArm","LeftLowerArm"},
+    {"UpperTorso","RightUpperArm"},
+    {"RightUpperArm","RightLowerArm"},
+    {"LowerTorso","LeftUpperLeg"},
+    {"LeftUpperLeg","LeftLowerLeg"},
+    {"LowerTorso","RightUpperLeg"},
+    {"RightUpperLeg","RightLowerLeg"}
+}
+
+function DarpaHub.Skeleton:Attach(character)
+    local lines = {}
+
+    for _, pair in ipairs(self.Bones) do
+        local l = DarpaHub.Render:CreateLine()
+        l.Draw.Color = Color3.fromRGB(255,255,255)
+        table.insert(lines, {Line=l, A=pair[1], B=pair[2]})
+    end
+
+    DarpaHub._private.Scheduler:AddJob(function()
+        for _, seg in ipairs(lines) do
+            local a = character:FindFirstChild(seg.A)
+            local b = character:FindFirstChild(seg.B)
+            if a and b then
+                local sa,va = DarpaHub.Render:WorldToScreen(a.Position)
+                local sb,vb = DarpaHub.Render:WorldToScreen(b.Position)
+                if va and vb then
+                    seg.Line.Draw.From = sa
+                    seg.Line.Draw.To = sb
+                    seg.Line.Draw.Visible = true
+                else
+                    seg.Line.Draw.Visible = false
+                end
+            end
+        end
+    end,{interval=0})
+
+end
+
+DarpaHub:GetSafeAPI().Skeleton = DarpaHub.Skeleton
+getgenv().DarpaHubSkeleton = DarpaHub.Skeleton
+
+-- ===============================
+-- DARPAHUB PERFORMANCE GOVERNOR
+-- ===============================
+
+DarpaHub.Performance = {
+    MinFPS = 40,
+    ThrottleLevel = 1
+}
+
+local frameCounter, last = 0, tick()
+
+DarpaHub._private.Scheduler:AddJob(function()
+    frameCounter += 1
+    if tick() - last >= 1 then
+        local fps = frameCounter
+        frameCounter = 0
+        last = tick()
+
+        if fps < DarpaHub.Performance.MinFPS then
+            DarpaHub.Render.Settings.UpdateRate = math.min(1/20, DarpaHub.Render.Settings.UpdateRate + 0.01)
+        else
+            DarpaHub.Render.Settings.UpdateRate = math.max(1/60, DarpaHub.Render.Settings.UpdateRate - 0.005)
+        end
+    end
+end,{interval=nil})
+
+DarpaHub:GetSafeAPI().Performance = DarpaHub.Performance
+
+-- ===============================
+-- DARPAHUB PROFILER OVERLAY
+-- ===============================
+
+DarpaHub.Overlay = {}
+
+function DarpaHub.Overlay:Create()
+    local txt = Drawing.new("Text")
+    txt.Size = 14
+    txt.Position = Vector2.new(20,20)
+    txt.Color = Color3.new(0,1,0)
+    txt.Outline = true
+
+    DarpaHub._private.Scheduler:AddJob(function()
+        local stats = DarpaHub._private.Profiler:GetStats()
+        local lines = {}
+        for k,v in pairs(stats) do
+            table.insert(lines, k.." "..string.format("%.4f",v.lastTime))
+        end
+        txt.Text = table.concat(lines,"\n")
+    end,{interval=0.2})
+
+    return txt
+end
+
+DarpaHub:GetSafeAPI().Overlay = DarpaHub.Overlay
+
+-- ===============================
+-- DARPAHUB MODULE LOADER
+-- ===============================
+
+DarpaHub.Modules = {}
+
+function DarpaHub.Modules:Register(name, mod)
+    self[name] = mod
+end
+
+function DarpaHub.Modules:Get(name)
+    return self[name]
+end
+
+function DarpaHub.Modules:List()
+    local t = {}
+    for k in pairs(self) do table.insert(t,k) end
+    return t
+end
+
+DarpaHub:GetSafeAPI().Modules = DarpaHub.Modules
+
+-- ===============================
+-- DARPAHUB RADAR ENGINE
+-- ===============================
+
+DarpaHub.Radar = {
+    Range = 400,
+    Points = {}
+}
+
+function DarpaHub.Radar:CreateDot()
+    local d = Drawing.new("Circle")
+    d.Radius = 3
+    d.Filled = true
+    return d
+end
+
+function DarpaHub.Radar:Track(part)
+    local dot = self:CreateDot()
+    table.insert(self.Points, {Part = part, Dot = dot})
+end
+
+DarpaHub._private.Scheduler:AddJob(function()
+    local cam = workspace.CurrentCamera
+    local origin = cam.CFrame.Position
+
+    for _, obj in ipairs(DarpaHub.Radar.Points) do
+        if obj.Part and obj.Part.Parent then
+            local offset = obj.Part.Position - origin
+            local dist = offset.Magnitude
+            if dist < DarpaHub.Radar.Range then
+                local pos = Vector2.new(120 + offset.X * 0.15, 120 + offset.Z * 0.15)
+                obj.Dot.Position = pos
+                obj.Dot.Visible = true
+            else
+                obj.Dot.Visible = false
+            end
+        end
+    end
+end,{interval=0})
+
+DarpaHub:GetSafeAPI().Radar = DarpaHub.Radar
+
+-- ===============================
+-- DARPAHUB MOTION CURVES
+-- ===============================
+
+DarpaHub.Motion = {}
+
+function DarpaHub.Motion:Bezier(p0,p1,p2,t)
+    return (1-t)^2*p0 + 2*(1-t)*t*p1 + t^2*p2
+end
+
+function DarpaHub.Motion:PredictArc(part,time)
+    local vel = part.AssemblyLinearVelocity
+    local mid = part.Position + vel * (time/2)
+    local endp = part.Position + vel * time
+    return self:Bezier(part.Position, mid, endp, 0.7)
+end
+
+DarpaHub:GetSafeAPI().Motion = DarpaHub.Motion
+
+-- ===============================
+-- DARPAHUB SMOOTH CONTROLLER
+-- ===============================
+
+DarpaHub.Smooth = {
+    Strength = 0.12
+}
+
+function DarpaHub.Smooth:Step(current,target)
+    local delta = target - current
+    return current + delta * self.Strength
+end
+
+function DarpaHub.Smooth:Adaptive(dist)
+    return math.clamp(0.05 + dist*0.0002, 0.05, 0.25)
+end
+
+DarpaHub:GetSafeAPI().Smooth = DarpaHub.Smooth
+
+-- ===============================
+-- DARPAHUB CONFIG PROFILES
+-- ===============================
+
+DarpaHub.Config = {}
+
+function DarpaHub.Config:Save(name,data)
+    DarpaHub:SaveJSON("profile_"..name, data)
+end
+
+function DarpaHub.Config:Load(name)
+    return DarpaHub:LoadJSON("profile_"..name)
+end
+
+function DarpaHub.Config:List()
+    local list = {}
+    if getgenv().DarpaHubPersist then
+        for k in pairs(getgenv().DarpaHubPersist) do
+            if k:find("profile_") then
+                table.insert(list,k)
+            end
+        end
+    end
+    return list
+end
+
+DarpaHub:GetSafeAPI().Config = DarpaHub.Config
+
+-- ===============================
+-- DARPAHUB RESOURCE MANAGER
+-- ===============================
+
+DarpaHub.Resources = {}
+
+function DarpaHub.Resources:Track(obj)
+    table.insert(self, obj)
+end
+
+function DarpaHub.Resources:Cleanup()
+    for _, o in ipairs(self) do
+        pcall(function()
+            if typeof(o) == "RBXScriptConnection" then o:Disconnect()
+            elseif o.Destroy then o:Destroy()
+            end
+        end)
+    end
+    self = {}
+end
+
+DarpaHub:GetSafeAPI().Resources = DarpaHub.Resources
+
+-- ===============================
+-- DARPAHUB NOTIFICATIONS
+-- ===============================
+
+DarpaHub.Notify = {}
+
+function DarpaHub.Notify:Push(text,color)
+    local t = Drawing.new("Text")
+    t.Text = text
+    t.Size = 16
+    t.Color = color or Color3.new(1,1,1)
+    t.Position = Vector2.new(20,300)
+
+    task.delay(3,function()
+        t:Remove()
+    end)
+end
+
+DarpaHub:GetSafeAPI().Notify = DarpaHub.Notify
+
+-- ===============================
+-- DARPAHUB LAYOUT ENGINE
+-- ===============================
+
+DarpaHub.Layout = {}
+
+function DarpaHub.Layout:Stack(frames,spacing)
+    spacing = spacing or 8
+    local y = 0
+    for _, f in ipairs(frames) do
+        f.Position = UDim2.new(0,0,0,y)
+        y = y + f.Size.Y.Offset + spacing
+    end
+end
+
+DarpaHub:GetSafeAPI().Layout = DarpaHub.Layout
+
+-- ===============================
+-- DARPAHUB INPUT ENGINE
+-- ===============================
+
+DarpaHub.Input = {Buffer = {}}
+
+function DarpaHub.Input:Record(input)
+    table.insert(self.Buffer, {Key=input.KeyCode,Time=tick()})
+end
+
+function DarpaHub.Input:Replay()
+    for _, i in ipairs(self.Buffer) do
+        print("Replay:",i.Key)
+    end
+end
+
+DarpaHub:GetSafeAPI().Input = DarpaHub.Input
+
+-- ===============================
+-- DARPAHUB UI FX
+-- ===============================
+
+DarpaHub.UIFX = {}
+
+function DarpaHub.UIFX:Glow(frame)
+    frame.BackgroundTransparency = 0.2
+end
+
+function DarpaHub.UIFX:Blur(frame)
+    frame.BackgroundTransparency = 0.5
+end
+
+DarpaHub:GetSafeAPI().UIFX = DarpaHub.UIFX
+
+-- ===============================
+-- DARPAHUB MODULE USAGE OPTIMIZER
+-- ===============================
+
+DarpaHub.ModuleOptimizer = {
+    Modules = {},
+    IdleTimeout = 15, -- seconds without usage = deactivate
+    CheckInterval = 5
+}
+
+local Optimizer = DarpaHub.ModuleOptimizer
+
+-- ===============================
+-- REGISTER MODULE
+-- ===============================
+
+function Optimizer:Register(name, mod)
+    self.Modules[name] = {
+        Module = mod,
+        LastUsed = tick(),
+        Active = true,
+        Calls = 0
+    }
+end
+
+-- ===============================
+-- MARK USAGE (called internally)
+-- ===============================
+
+function Optimizer:Touch(name)
+    local m = self.Modules[name]
+    if not m then return end
+
+    m.LastUsed = tick()
+    m.Calls += 1
+
+    if not m.Active then
+        self:Enable(name)
+    end
+end
+
+-- ===============================
+-- ENABLE/DISABLE
+-- ===============================
+
+function Optimizer:Disable(name)
+    local m = self.Modules[name]
+    if not m or not m.Active then return end
+
+    if m.Module.Disable then
+        pcall(function() m.Module:Disable() end)
+    end
+
+    m.Active = false
+end
+
+function Optimizer:Enable(name)
+    local m = self.Modules[name]
+    if not m or m.Active then return end
+
+    if m.Module.Enable then
+        pcall(function() m.Module:Enable() end)
+    end
+
+    m.Active = true
+end
+
+-- ===============================
+-- AUTO CLEAN LOOP
+-- ===============================
+
+DarpaHub._private.Scheduler:AddJob(function()
+    local now = tick()
+
+    for name, m in pairs(Optimizer.Modules) do
+        if m.Active and now - m.LastUsed > Optimizer.IdleTimeout then
+            Optimizer:Disable(name)
+        end
+    end
+end,{interval = Optimizer.CheckInterval})
+
+-- ===============================
+-- WRAP MODULE METHODS FOR AUTO TRACK
+-- ===============================
+
+function Optimizer:Wrap(name, mod)
+    self:Register(name, mod)
+
+    for key, val in pairs(mod) do
+        if type(val) == "function" then
+            mod[key] = function(...)
+                Optimizer:Touch(name)
+                return val(...)
+            end
+        end
+    end
+
+    return mod
+end
+
+-- ===============================
+-- DEBUG
+-- ===============================
+
+function Optimizer:Status()
+    local out = {}
+    for k,v in pairs(self.Modules) do
+        out[k] = {
+            active = v.Active,
+            calls = v.Calls,
+            idle = math.floor(tick() - v.LastUsed)
+        }
+    end
+    return out
+end
+
+-- ===============================
+-- SAFE EXPORT
+-- ===============================
+
+DarpaHub:GetSafeAPI().ModuleOptimizer = Optimizer
+getgenv().DarpaHubModuleOptimizer = Optimizer
+
 return DarpaHub
