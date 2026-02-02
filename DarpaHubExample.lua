@@ -6,7 +6,7 @@
 -- Date: Corrected version (fixed HttpGet logic & other Lua issues)
 
 -- CONFIG: change LIB_URL to your hosted DarpaHubLib.lua location if needed.
-local LIB_URL = "https://example.com/DarpaHubLib.lua" -- replace with your actual URL or let loader provide the lib
+local LIB_URL = "https://raw.githubusercontent.com/oogaboogaman1231/DARPA-HUB/refs/heads/main/DarpaHubLib.lua" -- replace with your actual URL or let loader provide the lib
 
 -- Attempt to obtain DarpaHub library safely.
 local DarpaHub = nil
@@ -579,3 +579,4 @@ EX.Notify = notify
 EX.Tabs = Tabs
 
 -- End of corrected Example file
+
