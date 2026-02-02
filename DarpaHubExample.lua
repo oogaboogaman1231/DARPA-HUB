@@ -10,7 +10,7 @@ print("║         Loading comprehensive demo...                     ║")
 print("╚═══════════════════════════════════════════════════════════╝")
 
 -- Load DarpaHub Library
-local DarpaHub = loadstring(game:HttpGet("YOUR_URL_HERE/DarpaHubLib.lua"))()
+local DarpaHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/oogaboogaman1231/DARPA-HUB/refs/heads/main/DarpaHubLib.lua"))()
 
 -- Initialize framework
 DarpaHub:Init("showcase_v6")
