@@ -1,211 +1,262 @@
 -- ============================================================
---   DARPA HUB EXAMPLE USAGE
---   Shows how to use the DarpaHub library in your scripts
+--   DARPA HUB FOR BLOXSTRIKE (FIXED & IMPROVED)
+--   Aimbot Avançado, ESP Completo e Fixes de Interface
 -- ============================================================
 
--- Load the library (in production, load from your URL)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- Load Library
 local DarpaHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/oogaboogaman1231/DARPA-HUB/refs/heads/main/DarpaHubLib.lua"))()
 
 -- ──────────────────────────────────────────────────────────
---  OPTIONAL: SHOW LOADER
+--  AIMBOT SETTINGS
 -- ──────────────────────────────────────────────────────────
-DarpaHub:CreateLoader()
-DarpaHub:UpdateLoader(20, "Loading library...")
-task.wait(0.5)
-DarpaHub:UpdateLoader(50, "Initializing UI...")
-task.wait(0.5)
-DarpaHub:UpdateLoader(80, "Almost ready...")
-task.wait(0.5)
-DarpaHub:UpdateLoader(100, "Done!")
-task.wait(0.3)
-DarpaHub:DestroyLoader()
+local Aimbot = {
+	Enabled = false,
+	WallCheck = true,
+	ShowFOV = false,
+	FOV = 100,
+	Smoothness = 5,
+	Key = Enum.UserInputType.MouseButton2, -- Padrão (Right Click)
+	TargetPart = "Head",
+	CurrentTarget = nil
+}
+
+-- FOV Circle Drawing
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Color = Color3.fromRGB(0, 210, 255)
+FOVCircle.Thickness = 1
+FOVCircle.NumSides = 60
+FOVCircle.Radius = Aimbot.FOV
+FOVCircle.Visible = false
+FOVCircle.Filled = false
+FOVCircle.Transparency = 1
 
 -- ──────────────────────────────────────────────────────────
---  CREATE WINDOW
+--  UI SETUP
 -- ──────────────────────────────────────────────────────────
-local Window = DarpaHub:CreateWindow("My Hub v1.0")
+local Window = DarpaHub:CreateWindow("Bloxstrike Hub v2.0")
 
--- ──────────────────────────────────────────────────────────
---  CREATE TABS
--- ──────────────────────────────────────────────────────────
 local CombatTab = Window:AddTab("Combat")
-local PlayerTab = Window:AddTab("Player")
-local VisualTab = Window:AddTab("Visual")
+local VisualTab = Window:AddTab("Visuals")
+local PlayerTab = Window:AddTab("Players")
 local MiscTab = Window:AddTab("Misc")
 
 -- ──────────────────────────────────────────────────────────
---  COMBAT TAB ELEMENTS
+--  COMBAT TAB
 -- ──────────────────────────────────────────────────────────
 
--- Simple toggle
-CombatTab:AddToggle("Auto Farm", false, function(enabled)
-	print("Auto Farm:", enabled)
-	-- Add your auto-farm logic here
-	if enabled then
-		-- Start farming
-	else
-		-- Stop farming
+CombatTab:AddToggle("Enable Aimbot", false, function(v)
+	Aimbot.Enabled = v
+end)
+
+CombatTab:AddDropdown("Aim Key", {"Right Mouse", "Left Mouse", "E", "Q", "Left Alt"}, "Right Mouse", function(selected)
+	if selected == "Right Mouse" then Aimbot.Key = Enum.UserInputType.MouseButton2
+	elseif selected == "Left Mouse" then Aimbot.Key = Enum.UserInputType.MouseButton1
+	elseif selected == "E" then Aimbot.Key = Enum.KeyCode.E
+	elseif selected == "Q" then Aimbot.Key = Enum.KeyCode.Q
+	elseif selected == "Left Alt" then Aimbot.Key = Enum.KeyCode.LeftAlt
 	end
 end)
 
--- Toggle with reference to control it later
-local AimbotToggle = CombatTab:AddToggle("Aimbot", false, function(enabled)
-	print("Aimbot:", enabled)
-	-- Add your aimbot logic here
+CombatTab:AddToggle("Wall Check", true, function(v)
+	Aimbot.WallCheck = v
 end)
 
--- Slider for FOV
-CombatTab:AddSlider("Aimbot FOV", 10, 500, 100, function(value)
-	print("FOV:", value)
-	-- Update your FOV circle size
+CombatTab:AddSlider("Aimbot FOV", 10, 400, 100, function(v)
+	Aimbot.FOV = v
+	FOVCircle.Radius = v
 end)
 
--- Dropdown for target part
-CombatTab:AddDropdown("Target Part", {"Head", "Torso", "HumanoidRootPart"}, "Head", function(selected)
-	print("Target part:", selected)
-	-- Update your aim target
+CombatTab:AddToggle("Show FOV Circle", false, function(v)
+	Aimbot.ShowFOV = v
+	FOVCircle.Visible = v
+end)
+
+CombatTab:AddSlider("Smoothness", 1, 20, 5, function(v)
+	Aimbot.Smoothness = v
+end)
+
+CombatTab:AddDropdown("Target Part", {"Head", "Torso"}, "Head", function(v)
+	Aimbot.TargetPart = v
 end)
 
 -- ──────────────────────────────────────────────────────────
---  PLAYER TAB ELEMENTS
+--  VISUALS TAB
 -- ──────────────────────────────────────────────────────────
 
--- Walkspeed slider
-PlayerTab:AddSlider("WalkSpeed", 16, 200, 16, function(speed)
-	DarpaHub.Utils:SetWalkSpeed(speed)
+VisualTab:AddToggle("Master ESP", false, function(v)
+	DarpaHub.ESP:Toggle(v)
 end)
 
--- JumpPower slider
-PlayerTab:AddSlider("JumpPower", 50, 300, 50, function(power)
-	DarpaHub.Utils:SetJumpPower(power)
+VisualTab:AddToggle("Boxes", true, function(v)
+	DarpaHub.ESP.Settings.Box = v
 end)
 
--- Teleport buttons using dropdown
+VisualTab:AddToggle("Health Bar", true, function(v)
+	DarpaHub.ESP.Settings.HealthBar = v
+end)
+
+VisualTab:AddToggle("Tracers", false, function(v)
+	DarpaHub.ESP.Settings.Tracers = v
+end)
+
+VisualTab:AddToggle("Names", true, function(v)
+	DarpaHub.ESP.Settings.Name = v
+end)
+
+VisualTab:AddToggle("Distance", true, function(v)
+	DarpaHub.ESP.Settings.Distance = v
+end)
+
+VisualTab:AddToggle("Team Check", true, function(v)
+	DarpaHub.ESP.Settings.TeamCheck = v
+end)
+
+VisualTab:AddSlider("Camera FOV", 70, 120, 70, function(v)
+	Camera.FieldOfView = v
+end)
+
+-- ──────────────────────────────────────────────────────────
+--  PLAYER TAB (Fixed Dropdown)
+-- ──────────────────────────────────────────────────────────
+
 local playerList = {}
-for _, player in ipairs(DarpaHub.Utils:GetPlayers()) do
-	table.insert(playerList, player.Name)
+local selectedPlayerName = nil
+
+local function RefreshPlayerList()
+	playerList = {}
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer then
+			table.insert(playerList, p.Name)
+		end
+	end
+	if #playerList == 0 then table.insert(playerList, "No Players") end
+	return playerList
 end
 
-if #playerList > 0 then
-	local selectedPlayer = playerList[1]
+local PlayerDropdown = PlayerTab:AddDropdown("Select Player", RefreshPlayerList(), "None", function(name)
+	selectedPlayerName = name
+end)
+
+PlayerTab:AddButton("Refresh List", function()
+	PlayerDropdown.Refresh(RefreshPlayerList())
+end)
+
+PlayerTab:AddButton("Teleport to Player", function()
+	if selectedPlayerName and selectedPlayerName ~= "No Players" then
+		local target = Players:FindFirstChild(selectedPlayerName)
+		if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+			LocalPlayer.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame
+		end
+	end
+end)
+
+-- ──────────────────────────────────────────────────────────
+--  MISC TAB
+-- ──────────────────────────────────────────────────────────
+
+MiscTab:AddButton("Reset Character", function()
+	if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+		LocalPlayer.Character.Humanoid.Health = 0
+	end
+end)
+
+MiscTab:AddButton("Fullbright", function()
+	game.Lighting.Brightness = 2
+	game.Lighting.ClockTime = 14
+	game.Lighting.FogEnd = 100000
+	game.Lighting.GlobalShadows = false
+end)
+
+MiscTab:AddButton("Unload UI", function()
+	FOVCircle:Remove()
+	DarpaHub.ESP:Toggle(false)
+	Window.Screen:Destroy()
+end)
+
+-- ──────────────────────────────────────────────────────────
+--  AIMBOT LOGIC
+-- ──────────────────────────────────────────────────────────
+
+local function IsVisible(targetPart)
+	if not Aimbot.WallCheck then return true end
+	local origin = Camera.CFrame.Position
+	local direction = (targetPart.Position - origin).Unit * (targetPart.Position - origin).Magnitude
 	
-	PlayerTab:AddDropdown("Select Player", playerList, selectedPlayer, function(name)
-		selectedPlayer = name
-	end)
+	local params = RaycastParams.new()
+	params.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+	params.FilterType = Enum.RaycastFilterType.Exclude
 	
-	PlayerTab:AddButton("Teleport to Player", function()
-		local targetPlayer = game.Players:FindFirstChild(selectedPlayer)
-		if targetPlayer then
-			local root = DarpaHub.Utils:GetRoot(targetPlayer)
-			if root then
-				DarpaHub.Utils:Teleport(root.CFrame)
-				print("Teleported to", selectedPlayer)
+	local result = Workspace:Raycast(origin, direction, params)
+	return result == nil or result.Instance:IsDescendantOf(targetPart.Parent)
+end
+
+local function GetClosestPlayer()
+	local closest = nil
+	local shortestDist = Aimbot.FOV
+	local mousePos = UserInputService:GetMouseLocation()
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+			-- Team Check
+			if player.Team == LocalPlayer.Team and #Players:GetTeams() > 1 then
+				continue 
+			end
+
+			local part = player.Character:FindFirstChild(Aimbot.TargetPart)
+			if part then
+				local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+				if onScreen then
+					local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+					if dist < shortestDist then
+						if IsVisible(part) then
+							shortestDist = dist
+							closest = part
+						end
+					end
+				end
 			end
 		end
-	end)
-else
-	PlayerTab:AddLabel("No other players in game")
+	end
+	return closest
 end
 
--- Get closest player button
-PlayerTab:AddButton("Show Closest Player", function()
-	local closest, distance = DarpaHub.Utils:GetClosestPlayer()
-	if closest then
-		print("Closest player:", closest.Name, "at", math.floor(distance), "studs")
-	else
-		print("No players found")
-	end
-end)
-
--- ──────────────────────────────────────────────────────────
---  VISUAL TAB ELEMENTS
--- ──────────────────────────────────────────────────────────
-
--- ESP Toggle (only works if executor supports Drawing API)
-VisualTab:AddToggle("ESP Boxes", false, function(enabled)
-	DarpaHub.ESP:Toggle(enabled)
-end)
-
-VisualTab:AddLabel("Note: ESP requires Drawing API support")
-
--- Fullbright
-VisualTab:AddToggle("Fullbright", false, function(enabled)
-	if enabled then
-		game.Lighting.Brightness = 2
-		game.Lighting.ClockTime = 14
-		game.Lighting.FogEnd = 100000
-		game.Lighting.GlobalShadows = false
-		game.Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
-	else
-		game.Lighting.Brightness = 1
-		game.Lighting.ClockTime = 12
-		game.Lighting.FogEnd = 100000
-		game.Lighting.GlobalShadows = true
-		game.Lighting.OutdoorAmbient = Color3.fromRGB(70, 70, 70)
-	end
-end)
-
--- FOV Changer
-VisualTab:AddSlider("Field of View", 70, 120, 70, function(fov)
-	workspace.CurrentCamera.FieldOfView = fov
-end)
-
--- ──────────────────────────────────────────────────────────
---  MISC TAB ELEMENTS
--- ──────────────────────────────────────────────────────────
-
--- Reset button
-MiscTab:AddButton("Reset Character", function()
-	if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-		LocalPlayer.Character:FindFirstChildOfClass("Humanoid").Health = 0
-	end
-end)
-
--- Rejoin button
-MiscTab:AddButton("Rejoin Server", function()
-	game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-end)
-
--- Server hop button
-MiscTab:AddButton("Server Hop", function()
-	local HttpService = game:GetService("HttpService")
-	local TeleportService = game:GetService("TeleportService")
+-- Render Loop for FOV Circle
+RunService.RenderStepped:Connect(function()
+	FOVCircle.Position = UserInputService:GetMouseLocation()
 	
-	local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
-	
-	for _, server in ipairs(servers.data) do
-		if server.id ~= game.JobId and server.playing < server.maxPlayers then
-			TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer)
-			break
+	if Aimbot.Enabled and Aimbot.CurrentTarget then
+		-- Aim Logic
+		local currentPos = Camera.CFrame.Position
+		local targetPos = Aimbot.CurrentTarget.Position
+		
+		-- Smoothness calculation
+		local targetCFrame = CFrame.new(currentPos, targetPos)
+		Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, 1 / Aimbot.Smoothness)
+	end
+end)
+
+-- Input Handling
+UserInputService.InputBegan:Connect(function(input)
+	if not Aimbot.Enabled then return end
+	if input.UserInputType == Aimbot.Key or input.KeyCode == Aimbot.Key then
+		local target = GetClosestPlayer()
+		if target then
+			Aimbot.CurrentTarget = target
 		end
 	end
 end)
 
--- Destroy UI button
-MiscTab:AddButton("Destroy UI", function()
-	Window:Destroy()
-	-- Clean up ESP if it was enabled
-	DarpaHub.ESP:Cleanup()
-	print("UI destroyed")
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Aimbot.Key or input.KeyCode == Aimbot.Key then
+		Aimbot.CurrentTarget = nil
+	end
 end)
 
--- Info label
-MiscTab:AddLabel("Hub loaded successfully!")
-MiscTab:AddLabel("Created with DarpaHub Library")
-
--- ──────────────────────────────────────────────────────────
---  PROGRAMMATIC CONTROL EXAMPLES
--- ──────────────────────────────────────────────────────────
-
--- You can control elements programmatically:
--- AimbotToggle:Set(true)   -- Enable aimbot from code
--- AimbotToggle:Get()       -- Get current state
-
--- Example: Auto-enable aimbot after 5 seconds
-task.spawn(function()
-	task.wait(5)
-	print("Auto-enabling aimbot...")
-	-- AimbotToggle:Set(true)  -- Uncomment to actually enable it
-end)
-
-print("[DARPA HUB] Example script loaded successfully!")
+print("DarpaHub Bloxstrike Loaded!")

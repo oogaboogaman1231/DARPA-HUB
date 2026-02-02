@@ -4,6 +4,10 @@
 --   Legit use only.  No undetection / anti‑cheat.
 -- ============================================================
 
+if not game:IsLoaded() then
+	game.Loaded:Wait()
+end
+
 local TweenService  = game:GetService("TweenService")
 local Players       = game:GetService("Players")
 local player        = Players.LocalPlayer
