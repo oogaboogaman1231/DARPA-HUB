@@ -2070,4 +2070,235 @@ end
 DarpaHub:GetSafeAPI().ModuleOptimizer = Optimizer
 getgenv().DarpaHubModuleOptimizer = Optimizer
 
+-- ===============================
+-- DARPAHUB UI PRO ENGINE
+-- ===============================
+
+DarpaHub.UIPro = {}
+
+local TweenService = game:GetService("TweenService")
+local UIS = game:GetService("UserInputService")
+
+-- ===============================
+-- BASE ELEMENT HELPERS
+-- ===============================
+
+local function tween(obj, time, props)
+    TweenService:Create(obj, TweenInfo.new(time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), props):Play()
+end
+
+local function rounded(parent, radius)
+    local c = Instance.new("UICorner", parent)
+    c.CornerRadius = UDim.new(0, radius)
+end
+
+-- ===============================
+-- WINDOW SYSTEM
+-- ===============================
+
+function DarpaHub.UIPro:CreateWindow(title, size)
+    local screen = DarpaHub._private.UI.ScreenGui
+
+    local win = Instance.new("Frame", screen)
+    win.Size = size or UDim2.new(0, 520, 0, 420)
+    win.Position = UDim2.new(0.5,-260,0.5,-210)
+    win.BackgroundColor3 = DarpaHub.Theme:GetColor("Primary")
+    win.BorderSizePixel = 0
+    rounded(win,12)
+
+    local header = Instance.new("Frame", win)
+    header.Size = UDim2.new(1,0,0,46)
+    header.BackgroundColor3 = DarpaHub.Theme:GetColor("Accent")
+    header.BorderSizePixel = 0
+    rounded(header,12)
+
+    local lbl = Instance.new("TextLabel", header)
+    lbl.Size = UDim2.new(1,-12,1,0)
+    lbl.Position = UDim2.new(0,6,0,0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = title
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 16
+    lbl.TextColor3 = Color3.new(1,1,1)
+
+    -- drag support
+    local dragging, dragStart, startPos
+
+    header.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = i.Position
+            startPos = win.Position
+        end
+    end)
+
+    UIS.InputChanged:Connect(function(i)
+        if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = i.Position - dragStart
+            win.Position = startPos + UDim2.new(0,delta.X,0,delta.Y)
+        end
+    end)
+
+    UIS.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    local body = Instance.new("ScrollingFrame", win)
+    body.Position = UDim2.new(0,0,0,54)
+    body.Size = UDim2.new(1,0,1,-60)
+    body.CanvasSize = UDim2.new(0,0,0,0)
+    body.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    body.ScrollBarThickness = 6
+    body.BackgroundTransparency = 1
+
+    return {
+        Window = win,
+        Body = body
+    }
+end
+
+-- ===============================
+-- SECTION
+-- ===============================
+
+function DarpaHub.UIPro:CreateSection(parent, name)
+    local sec = Instance.new("Frame", parent)
+    sec.Size = UDim2.new(1,-12,0,40)
+    sec.BackgroundColor3 = DarpaHub.Theme:GetColor("Primary")
+    sec.BorderSizePixel = 0
+    rounded(sec,8)
+
+    local title = Instance.new("TextLabel", sec)
+    title.Size = UDim2.new(1,-10,0,30)
+    title.Position = UDim2.new(0,5,0,5)
+    title.BackgroundTransparency = 1
+    title.Text = name
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 14
+    title.TextColor3 = DarpaHub.Theme:GetColor("Text")
+
+    local container = Instance.new("Frame", sec)
+    container.Position = UDim2.new(0,0,0,40)
+    container.Size = UDim2.new(1,0,0,0)
+    container.AutomaticSize = Enum.AutomaticSize.Y
+    container.BackgroundTransparency = 1
+
+    return container
+end
+
+-- ===============================
+-- TOGGLE
+-- ===============================
+
+function DarpaHub.UIPro:CreateToggle(parent, text, default, callback)
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1,-10,0,36)
+    frame.BackgroundTransparency = 1
+
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(1,-80,1,0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 13
+    lbl.TextColor3 = DarpaHub.Theme:GetColor("Text")
+
+    local btn = Instance.new("Frame", frame)
+    btn.Size = UDim2.new(0,52,0,24)
+    btn.Position = UDim2.new(1,-56,0.5,-12)
+    btn.BackgroundColor3 = default and DarpaHub.Theme:GetColor("Accent") or Color3.fromRGB(60,60,60)
+    rounded(btn,12)
+
+    local state = default
+
+    frame.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
+            state = not state
+            tween(btn,0.2,{
+                BackgroundColor3 = state and DarpaHub.Theme:GetColor("Accent") or Color3.fromRGB(60,60,60)
+            })
+            callback(state)
+        end
+    end)
+
+    return frame
+end
+
+-- ===============================
+-- SLIDER
+-- ===============================
+
+function DarpaHub.UIPro:CreateSlider(parent, text, min, max, default, cb)
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1,-10,0,42)
+    frame.BackgroundTransparency = 1
+
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(1,0,0,18)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 13
+    lbl.TextColor3 = DarpaHub.Theme:GetColor("Text")
+
+    local bar = Instance.new("Frame", frame)
+    bar.Position = UDim2.new(0,0,0,26)
+    bar.Size = UDim2.new(1,0,0,8)
+    bar.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    rounded(bar,6)
+
+    local fill = Instance.new("Frame", bar)
+    fill.Size = UDim2.new((default-min)/(max-min),0,1,0)
+    fill.BackgroundColor3 = DarpaHub.Theme:GetColor("Accent")
+    rounded(fill,6)
+
+    bar.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
+            local pos = math.clamp((i.Position.X - bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1)
+            fill.Size = UDim2.new(pos,0,1,0)
+            local val = min + (max-min)*pos
+            cb(val)
+        end
+    end)
+
+    return frame
+end
+
+-- ===============================
+-- DROPDOWN
+-- ===============================
+
+function DarpaHub.UIPro:CreateDropdown(parent, text, options, cb)
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1,-10,0,36)
+    frame.BackgroundTransparency = 1
+
+    local btn = Instance.new("TextButton", frame)
+    btn.Size = UDim2.new(1,0,1,0)
+    btn.Text = text
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 13
+    btn.BackgroundColor3 = DarpaHub.Theme:GetColor("Primary")
+    btn.TextColor3 = DarpaHub.Theme:GetColor("Text")
+    rounded(btn,6)
+
+    btn.MouseButton1Click:Connect(function()
+        for _,opt in ipairs(options) do
+            cb(opt)
+        end
+    end)
+
+    return frame
+end
+
+-- ===============================
+-- SAFE EXPORT
+-- ===============================
+
+DarpaHub:GetSafeAPI().UIPro = DarpaHub.UIPro
+getgenv().DarpaHubUIPro = DarpaHub.UIPro
+
+
 return DarpaHub
