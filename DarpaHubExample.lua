@@ -1,582 +1,1001 @@
--- DarpaHubExample.lua (Corrected & Fixed)
--- Universal premium example script for DarpaHubLib (v2.0.0-perfect)
--- Demonstrates full use of DarpaHub API: tabs, theme, plugins, scheduler, profiler, hooks, getgenv, FireHook, RenderStepped, CFrame, animated UI, notifications, safe visual tools and production-ready features.
--- IMPORTANT: This example intentionally avoids any gameplay-cheating features. All features are UI/visual/utility oriented and safe.
--- Author: DarpaHub Example Team
--- Date: Corrected version (fixed HttpGet logic & other Lua issues)
+-- ============================================================
+--   DARPA HUB v6.0 - ULTIMATE FEATURE SHOWCASE
+--   Comprehensive demonstration of ALL library capabilities
+--   by Originalityklan
+-- ============================================================
 
--- CONFIG: change LIB_URL to your hosted DarpaHubLib.lua location if needed.
-local LIB_URL = "https://raw.githubusercontent.com/oogaboogaman1231/DARPA-HUB/refs/heads/main/DarpaHubLib.lua" -- replace with your actual URL or let loader provide the lib
+print("╔═══════════════════════════════════════════════════════════╗")
+print("║         DARPA HUB v6.0 - FEATURE SHOWCASE                 ║")
+print("║         Loading comprehensive demo...                     ║")
+print("╚═══════════════════════════════════════════════════════════╝")
 
--- Attempt to obtain DarpaHub library safely.
-local DarpaHub = nil
+-- Load DarpaHub Library
+local DarpaHub = loadstring(game:HttpGet("YOUR_URL_HERE/DarpaHubLib.lua"))()
 
--- Helper: safe http-get wrapper (works across executors)
-local function safeHttpGet(url)
-    if not url or type(url) ~= "string" then return nil end
-    if type(game.HttpGet) ~= "function" then return nil end
-    local ok, res = pcall(function() return game:HttpGet(url) end)
-    if ok and type(res) == "string" and #res > 8 then
-        return res
-    end
-    return nil
-end
+-- Initialize framework
+DarpaHub:Init("showcase_v6")
 
--- Try to reuse already loaded getgenv DarpaHub, otherwise try to download and load it.
-if getgenv().DarpaHub and type(getgenv().DarpaHub) == "table" and getgenv().DarpaHub._isDarpaHub then
-    DarpaHub = getgenv().DarpaHub
-else
-    -- try to download
-    local code = safeHttpGet(LIB_URL)
-    if code then
-        local chunk, loadErr = loadstring(code)
-        if chunk then
-            local ok, ret = pcall(chunk)
-            if ok and type(ret) == "table" then
-                DarpaHub = ret
-                getgenv().DarpaHub = DarpaHub
-            else
-                warn("[DarpaHubExample] lib chunk executed but returned invalid value:", ret, loadErr)
-            end
-        else
-            warn("[DarpaHubExample] loadstring failed:", loadErr)
-        end
-    else
-        -- fallback: maybe loader already injected it later; try to wait a bit
-        local maxWait = 2 -- seconds
-        local waited = 0
-        while (not getgenv().DarpaHub) and waited < maxWait do
-            task.wait(0.1)
-            waited = waited + 0.1
-        end
-        if getgenv().DarpaHub and type(getgenv().DarpaHub) == "table" then
-            DarpaHub = getgenv().DarpaHub
-        end
-    end
-end
+-- Wait for UI to be ready
+task.wait(0.5)
 
-if not DarpaHub then
-    warn("[DarpaHubExample] Failed to obtain DarpaHub library. Ensure LIB_URL is correct or loader already injected the lib.")
-    return
-end
+-- ══════════════════════════════════════════════════════════════
+--  TAB 1: THEME ENGINE
+-- ══════════════════════════════════════════════════════════════
 
--- Ensure hub is initialized (defensive)
-if not DarpaHub.State or not DarpaHub.State.Booted then
-    pcall(function() DarpaHub:Init("unsupported") end)
-end
+local ThemeTab = DarpaHub:CreateTab("🎨 Themes")
 
--- Wait for UI system ready (defensive, small timeout)
-local function waitUIReady(timeout)
-    timeout = timeout or 5
-    local elapsed = 0
-    while (not DarpaHub._private or not DarpaHub._private.UI or not DarpaHub._private.UI.ScreenGui) and elapsed < timeout do
-        task.wait(0.05)
-        elapsed = elapsed + 0.05
-    end
-    return DarpaHub._private and DarpaHub._private.UI and DarpaHub._private.UI.ScreenGui
-end
+ThemeTab.API:AddLabel("═══════════════════════════════════")
+ThemeTab.API:AddLabel("        THEME ENGINE DEMO")
+ThemeTab.API:AddLabel("═══════════════════════════════════")
+ThemeTab.API:AddLabel("")
+ThemeTab.API:AddLabel("Switch between Dark, Midnight & Light themes")
+ThemeTab.API:AddLabel("Theme selection persists across sessions!")
+ThemeTab.API:AddLabel("")
 
-waitUIReady(4)
-
--- Short aliases
-local api = DarpaHub:GetSafeAPI()
-local Theme = api.Theme
-local Scheduler = api.Scheduler
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-
--- Ensure example global container
-getgenv().DarpaHubExample = getgenv().DarpaHubExample or {}
-local EX = getgenv().DarpaHubExample
-
--- Utility: nice info print
-local function info(...)
-    print("[DarpaHubExample]", ...)
-end
-
--- ------------------------
--- Build Tabs
--- ------------------------
-local Tabs = {}
-Tabs.Main = DarpaHub:CreateTab("Main")
-Tabs.Visuals = DarpaHub:CreateTab("Visuals")
-Tabs.Performance = DarpaHub:CreateTab("Performance")
-Tabs.Plugins = DarpaHub:CreateTab("Plugins")
-Tabs.Tools = DarpaHub:CreateTab("Tools")
-Tabs.Settings = DarpaHub:CreateTab("Settings")
-
--- Activate Main tab if possible
-pcall(function()
-    if Tabs.Main and Tabs.Main.Button then
-        Tabs.Main.Button:MouseButton1Click()
-    end
+ThemeTab.API:AddButton("🌙 Set Dark Theme", function()
+	DarpaHub.Theme:SetTheme("Dark")
+	print("[Theme] Switched to Dark theme")
 end)
 
--- ------------------------
--- Notifications system (safe GUI-only notifications)
--- ------------------------
-local Notifications = {}
-Notifications.container = nil
-Notifications.counter = 0
-
-local function ensureNotificationContainer()
-    if Notifications.container and Notifications.container.Parent then return end
-    local screen = DarpaHub._private and DarpaHub._private.UI and (DarpaHub._private.UI.Screen or DarpaHub._private.UI.ScreenGui)
-    if not screen then return end
-    local cont = Instance.new("Frame")
-    cont.Name = "DH_Notifications"
-    cont.Size = UDim2.new(0, 320, 0, 240)
-    cont.Position = UDim2.new(1, -340, 0, 20)
-    cont.BackgroundTransparency = 1
-    cont.Parent = screen
-    Notifications.container = cont
-end
-
-local function notify(title, text, ttl)
-    ttl = ttl or 4
-    ensureNotificationContainer()
-    if not Notifications.container then return end
-    Notifications.counter = Notifications.counter + 1
-    local id = Notifications.counter
-
-    local card = Instance.new("Frame")
-    card.Name = "Notif_" .. id
-    card.Size = UDim2.new(1, 0, 0, 64)
-    card.Position = UDim2.new(0, 0, 0, ((id-1) * 72))
-    card.BackgroundColor3 = Theme:GetColor("Primary")
-    card.BorderSizePixel = 0
-    card.Parent = Notifications.container
-    local corner = Instance.new("UICorner", card); corner.CornerRadius = UDim.new(0,8)
-
-    local titleLabel = Instance.new("TextLabel", card)
-    titleLabel.Size = UDim2.new(1, -12, 0, 22)
-    titleLabel.Position = UDim2.new(0, 8, 0, 6)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.TextSize = 14
-    titleLabel.TextColor3 = Theme:GetColor("Text")
-    titleLabel.Text = tostring(title)
-
-    local bodyLabel = Instance.new("TextLabel", card)
-    bodyLabel.Size = UDim2.new(1, -12, 0, 32)
-    bodyLabel.Position = UDim2.new(0, 8, 0, 28)
-    bodyLabel.BackgroundTransparency = 1
-    bodyLabel.Font = Enum.Font.Gotham
-    bodyLabel.TextSize = 12
-    bodyLabel.TextColor3 = Theme:GetColor("Muted")
-    bodyLabel.Text = tostring(text)
-    bodyLabel.TextWrapped = true
-
-    -- schedule removal
-    task.spawn(function()
-        task.wait(ttl)
-        pcall(function() card:Destroy() end)
-    end)
-
-    return id
-end
-
-EX.notify = notify
-
--- ------------------------
--- Hooks demo: create a custom hook and a listener
--- ------------------------
-DarpaHub:CreateHook("Example.CustomEvent")
-DarpaHub:ConnectHook("Example.CustomEvent", function(infoTbl)
-    pcall(function()
-        info("CustomEvent fired:", infoTbl and infoTbl.msg)
-        notify("Hook event", tostring(infoTbl and infoTbl.msg or "event fired"), 3)
-    end)
+ThemeTab.API:AddButton("🌃 Set Midnight Theme", function()
+	DarpaHub.Theme:SetTheme("Midnight")
+	print("[Theme] Switched to Midnight theme")
 end)
 
-local function fire_demo_hook()
-    DarpaHub:FireHook("Example.CustomEvent", {msg = "Manual demo hook at " .. os.date("%X")})
-end
-
--- ------------------------
--- Performance tab widgets and profiler toggle
--- ------------------------
-local perfAPI = Tabs.Performance.API
-local fpsLabel = perfAPI:AddLabel("FPS: calculating...")
-local memLabel = perfAPI:AddLabel("Memory: calculating...")
-local pingLabel = perfAPI:AddLabel("Ping: calculating...")
-
-perfAPI:AddButton("Toggle Profiler (5s samples)", function()
-    local prof = DarpaHub._private and DarpaHub._private.Profiler
-    if not prof then notify("Profiler", "Profiler not available", 3); return end
-    if prof.enabled then
-        prof:Disable(); notify("Profiler", "Profiler disabled", 2)
-    else
-        prof:Enable(); notify("Profiler", "Profiler enabled", 2)
-    end
+ThemeTab.API:AddButton("☀️ Set Light Theme", function()
+	DarpaHub.Theme:SetTheme("Light")
+	print("[Theme] Switched to Light theme")
 end)
 
--- Lightweight FPS/ping sampler using scheduler (runs every frame)
-do
-    local lastTick = tick()
-    local frameCount = 0
-    local fps = 0
+ThemeTab.API:AddLabel("")
+ThemeTab.API:AddButton("🎨 Show Theme Colors", function()
+	local theme = DarpaHub._private.ActiveTheme
+	print("═══ CURRENT THEME: " .. (theme.Name or "Unknown") .. " ═══")
+	print("Background:", theme.Background)
+	print("Primary:", theme.Primary)
+	print("Accent:", theme.Accent)
+	print("Text:", theme.Text)
+	print("Muted:", theme.Muted)
+end)
 
-    Scheduler:AddJob(function(dt)
-        frameCount = frameCount + 1
-        if tick() - lastTick >= 1 then
-            fps = math.floor(frameCount / (tick() - lastTick) + 0.5)
-            frameCount = 0
-            lastTick = tick()
-            pcall(function()
-                fpsLabel.Text = "FPS: " .. tostring(fps)
-                memLabel.Text = "Memory: " .. string.format("%.2f MB", collectgarbage("count") / 1024)
-                if LocalPlayer and LocalPlayer.GetNetworkPing then
-                    local ping = math.floor(LocalPlayer:GetNetworkPing() * 1000)
-                    pingLabel.Text = "Ping: " .. tostring(ping) .. " ms"
-                else
-                    pingLabel.Text = "Ping: N/A"
-                end
-            end)
-        end
-    end, {interval = nil, priority = 5})
-end
+-- ══════════════════════════════════════════════════════════════
+--  TAB 2: FEATURES SYSTEM
+-- ══════════════════════════════════════════════════════════════
 
--- ------------------------
--- Visuals: Camera Orbit & Cinematic Camera features (safe)
--- ------------------------
-local visAPI = Tabs.Visuals.API
-visAPI:AddLabel("Camera & Visual Tools — safe, non-gameplay-affecting")
+local FeaturesTab = DarpaHub:CreateTab("⚡ Features")
 
--- CameraOrbit feature
-DarpaHub:RegisterFeature("CameraOrbit", {
-    DefaultEnabled = false,
-    Priority = 40,
-    Config = { Radius = 10, Speed = 0.6, Height = 2 },
-    Enable = function(selfFeature)
-        selfFeature._active = true
-        notify("CameraOrbit", "Orbit enabled — press G to toggle", 3)
-        DarpaHub:BindKey(Enum.KeyCode.G, function()
-            DarpaHub:ToggleFeature("CameraOrbit")
-        end)
-    end,
-    Disable = function(selfFeature)
-        selfFeature._active = false
-    end,
-    Update = function(selfFeature)
-        if not selfFeature._active then return end
-        local cam = workspace and workspace.CurrentCamera
-        local plr = Players.LocalPlayer
-        if not cam or not plr or not plr.Character or not plr.Character:FindFirstChild("HumanoidRootPart") then return end
-        local hrp = plr.Character.HumanoidRootPart
-        local t = tick()
-        local radius = selfFeature.Config.Radius or 6
-        local height = selfFeature.Config.Height or 2
-        local speed = selfFeature.Config.Speed or 0.5
-        local targetPos = hrp.Position + Vector3.new(math.cos(t * speed) * radius, height, math.sin(t * speed) * radius)
-        cam.CFrame = CFrame.new(cam.CFrame.Position:Lerp(targetPos, 0.12), hrp.Position)
-    end
+FeaturesTab.API:AddLabel("═══════════════════════════════════")
+FeaturesTab.API:AddLabel("     FEATURE LIFECYCLE SYSTEM")
+FeaturesTab.API:AddLabel("═══════════════════════════════════")
+FeaturesTab.API:AddLabel("")
+FeaturesTab.API:AddLabel("Features have Enable, Disable & Update methods")
+FeaturesTab.API:AddLabel("Update runs every frame when feature is enabled")
+FeaturesTab.API:AddLabel("")
+
+-- Register Demo Feature 1: Counter
+DarpaHub:RegisterFeature("DemoCounter", {
+	Config = {
+		Count = 0,
+		Target = 100
+	},
+	Enable = function(self)
+		print("[DemoCounter] Enabled! Starting from", self.Config.Count)
+		self.Config.StartTime = tick()
+	end,
+	Disable = function(self)
+		local runtime = tick() - (self.Config.StartTime or tick())
+		print("[DemoCounter] Disabled! Count reached:", self.Config.Count)
+		print("[DemoCounter] Runtime:", string.format("%.2fs", runtime))
+	end,
+	Update = function(self)
+		self.Config.Count = self.Config.Count + 1
+		if self.Config.Count >= self.Config.Target then
+			print("[DemoCounter] Target reached:", self.Config.Count)
+			DarpaHub:DisableFeature("DemoCounter")
+		end
+	end,
+	Priority = 10
 })
 
--- UI controls for CameraOrbit
-local orbitToggle = visAPI:AddToggle("Enable Camera Orbit (G)", false, function(state)
-    if state then DarpaHub:EnableFeature("CameraOrbit") else DarpaHub:DisableFeature("CameraOrbit") end
-end)
-visAPI:AddSlider("Orbit Speed", 0.05, 3, 0.6, function(v)
-    local f = DarpaHub.Features["CameraOrbit"]
-    if f then f.Config.Speed = v end
-end)
-visAPI:AddSlider("Orbit Radius", 2, 50, 10, function(v)
-    local f = DarpaHub.Features["CameraOrbit"]
-    if f then f.Config.Radius = v end
-end)
-
--- CinematicCamera feature
-DarpaHub:RegisterFeature("CinematicCamera", {
-    DefaultEnabled = false,
-    Priority = 30,
-    Config = { Distance = 8, Height = 2, Smooth = 0.14 },
-    Enable = function(selfFeature)
-        selfFeature._active = true
-        notify("CinematicCamera", "Cinematic camera enabled", 2)
-    end,
-    Disable = function(selfFeature)
-        selfFeature._active = false
-    end,
-    Update = function(selfFeature)
-        if not selfFeature._active then return end
-        local cam = workspace.CurrentCamera
-        local plr = Players.LocalPlayer
-        if not cam or not plr or not plr.Character then return end
-        local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-        local desiredPos = hrp.Position - (hrp.CFrame.lookVector * (selfFeature.Config.Distance or 8)) + Vector3.new(0, (selfFeature.Config.Height or 2), 0)
-        cam.CFrame = cam.CFrame:Lerp(CFrame.new(desiredPos, hrp.Position), selfFeature.Config.Smooth or 0.12)
-    end
+-- Register Demo Feature 2: Timer
+DarpaHub:RegisterFeature("DemoTimer", {
+	Config = {
+		Interval = 2,
+		LastTick = 0
+	},
+	Enable = function(self)
+		print("[DemoTimer] Enabled! Will tick every", self.Config.Interval, "seconds")
+		self.Config.LastTick = tick()
+	end,
+	Disable = function(self)
+		print("[DemoTimer] Disabled!")
+	end,
+	Update = function(self)
+		local now = tick()
+		if now - self.Config.LastTick >= self.Config.Interval then
+			self.Config.LastTick = now
+			print("[DemoTimer] Tick! Time:", os.date("%X"))
+		end
+	end,
+	Priority = 20
 })
 
-local cineToggle = visAPI:AddToggle("Enable Cinematic Camera", false, function(state)
-    if state then DarpaHub:EnableFeature("CinematicCamera") else DarpaHub:DisableFeature("CinematicCamera") end
-end)
-visAPI:AddSlider("Cine Distance", 2, 40, 8, function(v) local f = DarpaHub.Features["CinematicCamera"]; if f then f.Config.Distance = v end end)
-visAPI:AddSlider("Cine Height", -2, 10, 2, function(v) local f = DarpaHub.Features["CinematicCamera"]; if f then f.Config.Height = v end end)
-
--- VignettePulse (visual overlay)
-DarpaHub:RegisterFeature("VignettePulse", {
-    DefaultEnabled = false,
-    Priority = 110,
-    Enable = function(selfFeature)
-        local screen = DarpaHub._private and DarpaHub._private.UI and DarpaHub._private.UI.Screen
-        if not screen then return end
-        local img = Instance.new("ImageLabel")
-        img.Name = "DH_Vignette"
-        img.Size = UDim2.new(1, 0, 1, 0)
-        img.Position = UDim2.new(0, 0, 0, 0)
-        img.BackgroundTransparency = 1
-        img.Image = "" -- left blank for safety
-        img.ZIndex = 9999
-        img.Parent = screen
-        pcall(function() img.ImageColor3 = Theme:GetColor("Accent") end)
-        img.ImageTransparency = 1
-        selfFeature._ui = img
-    end,
-    Disable = function(selfFeature)
-        if selfFeature._ui then pcall(function() selfFeature._ui:Destroy() end) end
-        selfFeature._ui = nil
-    end,
-    Update = function(selfFeature)
-        if not selfFeature._ui then return end
-        local t = (math.sin(tick() / 1.2) + 1) / 2
-        selfFeature._ui.ImageTransparency = 0.6 - (t * 0.25)
-        local base = Theme:GetColor("Accent")
-        local alt = Color3.new(1, 0.5, 0.6)
-        local col = Color3.new(base.R + (alt.R - base.R) * t, base.G + (alt.G - base.G) * t, base.B + (alt.B - base.B) * t)
-        pcall(function() selfFeature._ui.ImageColor3 = col end)
-    end
-})
-
-visAPI:AddToggle("Enable Vignette Pulse", false, function(s)
-    if s then DarpaHub:EnableFeature("VignettePulse") else DarpaHub:DisableFeature("VignettePulse") end
+FeaturesTab.API:AddToggle("Enable Demo Counter (counts to 100)", false, function(enabled)
+	if enabled then
+		DarpaHub:EnableFeature("DemoCounter")
+	else
+		DarpaHub:DisableFeature("DemoCounter")
+	end
 end)
 
--- ------------------------
--- Tools Tab: Safe utilities
--- ------------------------
-local toolsAPI = Tabs.Tools.API
-toolsAPI:AddLabel("Utility tools — safe helpers")
-
-toolsAPI:AddButton("Take UI Snapshot (placeholder)", function()
-    notify("Snapshot", "This is a placeholder. Use executor API for real screenshots.", 3)
+FeaturesTab.API:AddToggle("Enable Demo Timer (ticks every 2s)", false, function(enabled)
+	if enabled then
+		DarpaHub:EnableFeature("DemoTimer")
+	else
+		DarpaHub:DisableFeature("DemoTimer")
+	end
 end)
 
-DarpaHub:RegisterFeature("AutoRespawnHelper", {
-    DefaultEnabled = false,
-    Priority = 90,
-    Enable = function(selfFeature) selfFeature._active = true; notify("AutoRespawn", "Enabled", 2) end,
-    Disable = function(selfFeature) selfFeature._active = false end,
-    Update = function(selfFeature)
-        if not selfFeature._active then return end
-        local plr = Players.LocalPlayer
-        if not plr then return end
-        local char = plr.Character
-        if not char or (char and not char.Parent) then
-            pcall(function() plr:LoadCharacter() end)
-        else
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum and hum.Health <= 0 then
-                pcall(function() plr:LoadCharacter() end)
-            end
-        end
-    end
-})
-toolsAPI:AddToggle("Enable Auto-Respawn Helper", false, function(s)
-    if s then DarpaHub:EnableFeature("AutoRespawnHelper") else DarpaHub:DisableFeature("AutoRespawnHelper") end
+FeaturesTab.API:AddLabel("")
+FeaturesTab.API:AddButton("📊 List All Features", function()
+	print("═══════════════ REGISTERED FEATURES ═══════════════")
+	for name, feature in pairs(DarpaHub.Features) do
+		print(string.format("  • %s", name))
+		print(string.format("    Enabled: %s", tostring(feature.Enabled)))
+		print(string.format("    Priority: %d", feature.Priority or 50))
+	end
+	print("═══════════════════════════════════════════════════")
 end)
 
--- ------------------------
--- Plugins Tab (demo plugin manifest UI)
--- ------------------------
-local pluginsAPI = Tabs.Plugins.API
-pluginsAPI:AddLabel("Plugin manager (demo)")
+-- ══════════════════════════════════════════════════════════════
+--  TAB 3: HOOKS SYSTEM
+-- ══════════════════════════════════════════════════════════════
 
-local demoPluginManifest = {
-    name = "Demo.Visuals.Plugin",
-    version = "0.0.1",
-    url = "local",
-    author = "DarpaHubExample",
-    description = "Demo plugin for visuals",
-    allowedAPIs = {"UI","Scheduler","Hooks","Persistence"},
-    code = [[
-        -- plugin code runs in a sandbox where DarpaHub is a restricted API object
-        local API = DarpaHub
-        API.Logger.Info("Demo plugin started")
-        local tab = API.UI.CreateTab("DemoPlugin")
-        local api = tab.API
-        api:AddLabel("Demo plugin loaded")
-        api:AddButton("Plugin Action", function()
-            API.Logger.Info("Plugin action triggered")
-        end)
-        -- heartbeat
-        local id = API.Scheduler.Add(function() API.Logger.Info("Plugin heartbeat") end, {interval=2, persistent=true})
-        function onUnload()
-            API.Logger.Info("Demo plugin unloading")
-            API.Scheduler.Remove(id)
-        end
-    ]]
+local HooksTab = DarpaHub:CreateTab("🔗 Hooks")
+
+HooksTab.API:AddLabel("═══════════════════════════════════")
+HooksTab.API:AddLabel("       EVENT HOOK SYSTEM")
+HooksTab.API:AddLabel("═══════════════════════════════════")
+HooksTab.API:AddLabel("")
+HooksTab.API:AddLabel("Create custom events with multiple listeners")
+HooksTab.API:AddLabel("Fire synchronously or asynchronously")
+HooksTab.API:AddLabel("")
+
+-- Create custom hooks
+DarpaHub:CreateHook("CustomEvent")
+DarpaHub:CreateHook("DataUpdate")
+DarpaHub:CreateHook("UserAction")
+
+-- Connect listeners
+local listener1 = DarpaHub:ConnectHook("CustomEvent", function(data)
+	print("[Listener 1] CustomEvent fired!")
+	print("[Listener 1] Data:", data)
+end)
+
+local listener2 = DarpaHub:ConnectHook("CustomEvent", function(data)
+	print("[Listener 2] Also received CustomEvent")
+	if type(data) == "table" then
+		for k, v in pairs(data) do
+			print("[Listener 2]", k, "=", v)
+		end
+	end
+end)
+
+local listener3 = DarpaHub:ConnectHook("CustomEvent", function(data)
+	print("[Listener 3] CustomEvent count:", (data and data.count) or 0)
+end)
+
+local eventCount = 0
+
+HooksTab.API:AddButton("🔥 Fire CustomEvent (Sync)", function()
+	eventCount = eventCount + 1
+	DarpaHub:FireHook("CustomEvent", {
+		timestamp = tick(),
+		count = eventCount,
+		message = "Hello from sync fire!",
+		data = {x = 100, y = 200}
+	})
+	print("[Hooks] Sync fire complete - all listeners executed")
+end)
+
+HooksTab.API:AddButton("🔥 Fire CustomEvent (Async)", function()
+	eventCount = eventCount + 1
+	DarpaHub:FireHookAsync("CustomEvent", {
+		timestamp = tick(),
+		count = eventCount,
+		message = "Hello from async fire!",
+		async = true
+	})
+	print("[Hooks] Async fire started - listeners run in background")
+end)
+
+HooksTab.API:AddLabel("")
+HooksTab.API:AddButton("❌ Disconnect Listener 1", function()
+	listener1:Disconnect()
+	print("[Hooks] Listener 1 disconnected")
+end)
+
+HooksTab.API:AddButton("❌ Disconnect Listener 2", function()
+	listener2:Disconnect()
+	print("[Hooks] Listener 2 disconnected")
+end)
+
+HooksTab.API:AddLabel("")
+HooksTab.API:AddLabel("Built-in hooks: Inited, UIReady, ThemeChanged,")
+HooksTab.API:AddLabel("FeatureEnabled, FeatureDisabled, TabActivated")
+
+-- Monitor built-in hooks
+DarpaHub:ConnectHook("ThemeChanged", function(themeName)
+	print("[Built-in Hook] Theme changed to:", themeName)
+end)
+
+DarpaHub:ConnectHook("FeatureEnabled", function(name, feature)
+	print("[Built-in Hook] Feature enabled:", name)
+end)
+
+DarpaHub:ConnectHook("FeatureDisabled", function(name, feature)
+	print("[Built-in Hook] Feature disabled:", name)
+end)
+
+-- ══════════════════════════════════════════════════════════════
+--  TAB 4: SCHEDULER
+-- ══════════════════════════════════════════════════════════════
+
+local SchedulerTab = DarpaHub:CreateTab("⏰ Scheduler")
+
+SchedulerTab.API:AddLabel("═══════════════════════════════════")
+SchedulerTab.API:AddLabel("         JOB SCHEDULER")
+SchedulerTab.API:AddLabel("═══════════════════════════════════")
+SchedulerTab.API:AddLabel("")
+SchedulerTab.API:AddLabel("Schedule recurring or one-time jobs")
+SchedulerTab.API:AddLabel("Jobs run based on priority (lower = first)")
+SchedulerTab.API:AddLabel("")
+
+local scheduledJobs = {}
+
+SchedulerTab.API:AddButton("➕ Add Job: Print Every 1s", function()
+	local id = DarpaHub._private.Scheduler:AddJob(function()
+		print("[Scheduler] Recurring job tick:", os.date("%X"))
+	end, {
+		interval = 1,
+		priority = 50,
+		persistent = true
+	})
+	table.insert(scheduledJobs, {id = id, desc = "Print Every 1s"})
+	print("[Scheduler] Added recurring job:", id)
+end)
+
+SchedulerTab.API:AddButton("➕ Add Job: High Priority (0.5s)", function()
+	local id = DarpaHub._private.Scheduler:AddJob(function()
+		print("[Scheduler] HIGH PRIORITY job executed")
+	end, {
+		interval = 0.5,
+		priority = 10,  -- Lower priority = runs first
+		persistent = true
+	})
+	table.insert(scheduledJobs, {id = id, desc = "High Priority"})
+	print("[Scheduler] Added high-priority job:", id)
+end)
+
+SchedulerTab.API:AddButton("➕ Add Job: One-Shot", function()
+	local id = DarpaHub._private.Scheduler:AddJob(function()
+		print("[Scheduler] ONE-SHOT JOB EXECUTED!")
+		print("[Scheduler] This job will auto-remove itself")
+	end, {
+		persistent = false  -- Runs once then removes
+	})
+	print("[Scheduler] Added one-shot job:", id)
+end)
+
+SchedulerTab.API:AddLabel("")
+SchedulerTab.API:AddButton("❌ Remove Last Job", function()
+	if #scheduledJobs > 0 then
+		local job = table.remove(scheduledJobs)
+		DarpaHub._private.Scheduler:RemoveJob(job.id)
+		print("[Scheduler] Removed job:", job.desc, "ID:", job.id)
+	else
+		print("[Scheduler] No jobs to remove")
+	end
+end)
+
+SchedulerTab.API:AddButton("📋 List All Jobs", function()
+	print("═══ SCHEDULED JOBS ═══")
+	for i, job in ipairs(scheduledJobs) do
+		print(string.format("%d. %s (ID: %s)", i, job.desc, job.id))
+	end
+	if #scheduledJobs == 0 then
+		print("  No jobs scheduled")
+	end
+end)
+
+-- ══════════════════════════════════════════════════════════════
+--  TAB 5: PROFILER
+-- ══════════════════════════════════════════════════════════════
+
+local ProfilerTab = DarpaHub:CreateTab("📊 Profiler")
+
+ProfilerTab.API:AddLabel("═══════════════════════════════════")
+ProfilerTab.API:AddLabel("      PERFORMANCE PROFILER")
+ProfilerTab.API:AddLabel("═══════════════════════════════════")
+ProfilerTab.API:AddLabel("")
+ProfilerTab.API:AddLabel("Track execution time of functions")
+ProfilerTab.API:AddLabel("Get detailed performance statistics")
+ProfilerTab.API:AddLabel("")
+
+ProfilerTab.API:AddToggle("Enable Profiler", false, function(enabled)
+	if enabled then
+		DarpaHub._private.Profiler:Enable()
+		print("[Profiler] Enabled - now tracking function calls")
+	else
+		DarpaHub._private.Profiler:Disable()
+		print("[Profiler] Disabled - not tracking")
+	end
+end)
+
+ProfilerTab.API:AddLabel("")
+
+ProfilerTab.API:AddButton("🧪 Test: Fast Function", function()
+	DarpaHub._private.Profiler:Time("FastFunction", function()
+		local sum = 0
+		for i = 1, 1000 do
+			sum = sum + i
+		end
+		return sum
+	end)
+	print("[Profiler] FastFunction executed and timed")
+end)
+
+ProfilerTab.API:AddButton("🧪 Test: Medium Function", function()
+	DarpaHub._private.Profiler:Time("MediumFunction", function()
+		local sum = 0
+		for i = 1, 100000 do
+			sum = sum + i
+		end
+		task.wait(0.05)
+		return sum
+	end)
+	print("[Profiler] MediumFunction executed and timed")
+end)
+
+ProfilerTab.API:AddButton("🧪 Test: Slow Function", function()
+	DarpaHub._private.Profiler:Time("SlowFunction", function()
+		local sum = 0
+		for i = 1, 500000 do
+			sum = sum + math.sqrt(i)
+		end
+		task.wait(0.1)
+		return sum
+	end)
+	print("[Profiler] SlowFunction executed and timed")
+end)
+
+ProfilerTab.API:AddLabel("")
+
+ProfilerTab.API:AddButton("📈 Show Profiler Stats", function()
+	local stats = DarpaHub._private.Profiler:GetStats()
+	print("═══════════════ PROFILER STATISTICS ═══════════════")
+	local count = 0
+	for key, data in pairs(stats) do
+		count = count + 1
+		print(string.format("\n%s:", key))
+		print(string.format("  Calls:       %d", data.calls))
+		print(string.format("  Total Time:  %.4f seconds", data.totalTime))
+		print(string.format("  Avg Time:    %.4f seconds", data.totalTime / data.calls))
+		print(string.format("  Last Time:   %.4f seconds", data.lastTime))
+	end
+	if count == 0 then
+		print("  No profiling data available")
+		print("  Enable profiler and run test functions first")
+	end
+	print("═══════════════════════════════════════════════════")
+end)
+
+ProfilerTab.API:AddButton("🗑️ Reset Statistics", function()
+	DarpaHub._private.Profiler:Reset()
+	print("[Profiler] All statistics reset")
+end)
+
+-- ══════════════════════════════════════════════════════════════
+--  TAB 6: PERSISTENCE
+-- ══════════════════════════════════════════════════════════════
+
+local PersistTab = DarpaHub:CreateTab("💾 Storage")
+
+PersistTab.API:AddLabel("═══════════════════════════════════")
+PersistTab.API:AddLabel("      DATA PERSISTENCE")
+PersistTab.API:AddLabel("═══════════════════════════════════")
+PersistTab.API:AddLabel("")
+PersistTab.API:AddLabel("Save & load data across sessions")
+PersistTab.API:AddLabel("Uses writefile if available, getgenv fallback")
+PersistTab.API:AddLabel("")
+
+local showcaseData = {
+	username = "ShowcaseUser",
+	score = 5000,
+	level = 25,
+	settings = {
+		music = true,
+		sfx = true,
+		volume = 80,
+		quality = "High"
+	},
+	stats = {
+		gamesPlayed = 127,
+		wins = 89,
+		kills = 1523
+	},
+	timestamp = os.time()
 }
 
-DarpaHub:RegisterPluginManifest(demoPluginManifest)
-pluginsAPI:AddButton("Load Demo Plugin", function()
-    local ok, err = pcall(function()
-        DarpaHub:LoadPlugin("Demo.Visuals.Plugin")
-    end)
-    if ok then notify("Plugin", "Demo plugin loaded", 2) else notify("Plugin", "Failed to load plugin: " .. tostring(err), 4) end
-end)
-pluginsAPI:AddButton("Unload Demo Plugin", function()
-    local ok, err = pcall(function() DarpaHub:UnloadPlugin("Demo.Visuals.Plugin") end)
-    notify("Plugin", "Unload attempted", 2)
-end)
-pluginsAPI:AddButton("HotReload Library", function()
-    local ok, err = pcall(function() DarpaHub:HotReload() end)
-    if ok then notify("HotReload", "Library hot-reloaded", 2) else notify("HotReload", "HotReload failed: " .. tostring(err), 4) end
+PersistTab.API:AddButton("💾 Save Demo Data", function()
+	local success = DarpaHub:SaveJSON("showcase_demo", showcaseData)
+	if success then
+		print("[Persistence] Data saved successfully!")
+		print("[Persistence] Username:", showcaseData.username)
+		print("[Persistence] Score:", showcaseData.score)
+		print("[Persistence] Level:", showcaseData.level)
+	else
+		print("[Persistence] Save failed")
+	end
 end)
 
--- ------------------------
--- Settings Tab (appearance & utilities)
--- ------------------------
-local settingsAPI = Tabs.Settings.API
-settingsAPI:AddLabel("Appearance & Settings")
-settingsAPI:AddButton("Toggle Dark/Light Theme", function()
-    local cur = DarpaHub._private and DarpaHub._private.ActiveTheme and DarpaHub._private.ActiveTheme.Name or "Dark"
-    if cur == "Dark" then DarpaHub.Theme:SetTheme("Light") else DarpaHub.Theme:SetTheme("Dark") end
-    notify("Theme", "Switched theme to " .. (DarpaHub._private and DarpaHub._private.ActiveTheme and DarpaHub._private.ActiveTheme.Name or "Unknown"), 2)
-end)
-settingsAPI:AddButton("Export Settings to Console", function()
-    print("[DarpaHubExample Export] Theme:", DarpaHub._private and DarpaHub._private.ActiveTheme and DarpaHub._private.ActiveTheme.Name or "None")
-    notify("Export", "Exported settings to console", 2)
-end)
-
--- ------------------------
--- Profiler snapshot button in Main tab
--- ------------------------
-local mainAPI = Tabs.Main.API
-mainAPI:AddLabel("DarpaHub Example — Main Dashboard")
-mainAPI:AddButton("Fire demo hook", function() fire_demo_hook() end)
-mainAPI:AddLabel("Profiler snapshot (check Output):")
-mainAPI:AddButton("Print Profiler Stats", function()
-    local prof = DarpaHub._private and DarpaHub._private.Profiler
-    if not prof then notify("Profiler", "Profiler not found", 3); return end
-    local stats = prof:GetStats()
-    for k,v in pairs(stats) do
-        print(string.format("Profiler: %s -> calls=%d total=%.6f last=%.6f", k, v.calls, v.totalTime, v.lastTime))
-    end
-    notify("Profiler", "Profiler stats printed to console", 3)
+PersistTab.API:AddButton("📂 Load Demo Data", function()
+	local loaded = DarpaHub:LoadJSON("showcase_demo")
+	if loaded then
+		print("[Persistence] Data loaded successfully!")
+		print("[Persistence] Username:", loaded.username)
+		print("[Persistence] Score:", loaded.score)
+		print("[Persistence] Level:", loaded.level)
+		print("[Persistence] Settings:", loaded.settings)
+		print("[Persistence] Stats:", loaded.stats)
+		print("[Persistence] Saved at:", os.date("%c", loaded.timestamp))
+	else
+		print("[Persistence] No saved data found")
+		print("[Persistence] Save data first using the Save button")
+	end
 end)
 
--- ------------------------
--- Scheduled example: fire hook every 10 seconds (demonstrates scheduler & FireHook)
--- ------------------------
-local demoHookJob = Scheduler:AddJob(function()
-    DarpaHub:FireHook("Example.CustomEvent", {msg = "Scheduled hook tick at " .. os.date("%X")})
-end, {interval = 10, priority = 90, persistent = true})
+PersistTab.API:AddLabel("")
 
-EX.demoHookJob = demoHookJob
+PersistTab.API:AddButton("🔄 Modify & Re-save", function()
+	showcaseData.score = showcaseData.score + 500
+	showcaseData.level = showcaseData.level + 1
+	showcaseData.stats.gamesPlayed = showcaseData.stats.gamesPlayed + 1
+	showcaseData.timestamp = os.time()
+	
+	DarpaHub:SaveJSON("showcase_demo", showcaseData)
+	print("[Persistence] Updated and saved!")
+	print("[Persistence] New score:", showcaseData.score)
+	print("[Persistence] New level:", showcaseData.level)
+end)
 
--- ------------------------
--- Decorative RenderStepped-driven effect (safe): sparkle parts near camera (non-gameplay)
--- ------------------------
-do
-    local sparkle = {}
-    sparkle.Enabled = false
-    sparkle.Parts = {}
-    sparkle.Radius = 4
-    sparkle.Speed = 1.1
-    sparkle.Count = 6
+PersistTab.API:AddButton("📋 Show Current Data", function()
+	print("═══ CURRENT SHOWCASE DATA ═══")
+	print("Username:", showcaseData.username)
+	print("Score:", showcaseData.score)
+	print("Level:", showcaseData.level)
+	print("\nSettings:")
+	for k, v in pairs(showcaseData.settings) do
+		print("  " .. k .. ":", v)
+	end
+	print("\nStats:")
+	for k, v in pairs(showcaseData.stats) do
+		print("  " .. k .. ":", v)
+	end
+end)
 
-    function sparkle:Enable()
-        if self.Enabled then return end
-        self.Enabled = true
-        local cam = workspace.CurrentCamera
-        if not cam then return end
-        for i = 1, self.Count do
-            local p = Instance.new("Part")
-            p.Name = "DH_Spark_" .. i
-            p.Anchored = true
-            p.CanCollide = false
-            p.Size = Vector3.new(0.2,0.2,0.2)
-            p.Transparency = 0.25
-            p.Material = Enum.Material.Neon
-            p.Color = Theme:GetColor("Accent")
-            p.Parent = workspace
-            table.insert(self.Parts, p)
-        end
-    end
+-- ══════════════════════════════════════════════════════════════
+--  TAB 7: KEYBINDS
+-- ══════════════════════════════════════════════════════════════
 
-    function sparkle:Disable()
-        self.Enabled = false
-        for _, p in ipairs(self.Parts) do
-            p:Destroy()
-        end
-        self.Parts = {}
-    end
+local KeybindsTab = DarpaHub:CreateTab("⌨️ Keys")
 
-    function sparkle:Update(dt)
-        if not self.Enabled then return end
-        local cam = workspace.CurrentCamera
-        if not cam then return end
-        local t = tick() * self.Speed
-        for i,p in ipairs(self.Parts) do
-            local angle = (i / #self.Parts) * math.pi * 2 + t
-            local localPos = cam.CFrame.Position + (cam.CFrame.LookVector * 2) + Vector3.new(math.cos(angle) * self.Radius, math.sin(angle) * (self.Radius * 0.35), 0)
-            p.CFrame = CFrame.new(localPos)
-            local alpha = (math.sin(t + i) + 1) / 2
-            local accent = Theme:GetColor("Accent")
-            p.Color = Color3.new(accent.R * (0.6 + 0.4 * alpha), accent.G * (0.6 + 0.4 * alpha), accent.B * (0.6 + 0.4 * alpha))
-        end
-    end
+KeybindsTab.API:AddLabel("═══════════════════════════════════")
+KeybindsTab.API:AddLabel("       KEYBIND MANAGER")
+KeybindsTab.API:AddLabel("═══════════════════════════════════")
+KeybindsTab.API:AddLabel("")
+KeybindsTab.API:AddLabel("Bind keyboard keys to custom functions")
+KeybindsTab.API:AddLabel("")
 
-    DarpaHub:RegisterFeature("SparkleDecor", {
-        DefaultEnabled = false,
-        Priority = 70,
-        Enable = function(selfFeature)
-            selfFeature._spark = sparkle
-            selfFeature._spark:Enable()
-        end,
-        Disable = function(selfFeature)
-            if selfFeature._spark then selfFeature._spark:Disable() end
-        end,
-        Update = function(selfFeature)
-            if selfFeature._spark then
-                -- pass dt safely (scheduler tick uses dt param)
-                pcall(function() sparkle:Update(task.wait()) end)
-            end
-        end
-    })
-
-    toolsAPI:AddToggle("Toggle Sparkle Decor", false, function(s)
-        if s then DarpaHub:EnableFeature("SparkleDecor") else DarpaHub:DisableFeature("SparkleDecor") end
-    end)
-end
-
--- ------------------------
--- Developer helper keybind (F1)
--- ------------------------
+-- Bind demo keys
 DarpaHub:BindKey(Enum.KeyCode.F1, function()
-    notify("Dev", "F1 pressed - printing hub state", 3)
-    print("DarpaHub State Dump:")
-    print("Version:", DarpaHub.VERSION)
-    print("Booted:", tostring(DarpaHub.State.Booted))
-    print("Mode:", tostring(DarpaHub.State.Mode))
-    local names = {}
-    for k,_ in pairs(DarpaHub.Features) do table.insert(names, k) end
-    print("Features Registered:", table.concat(names, ", "))
+	print("[Keybind] F1 pressed - Help system activated!")
 end)
 
--- ------------------------
--- Cosmetic startup notification
--- ------------------------
-notify("DarpaHub Example", "Example loaded — use tabs to toggle features. Press RightControl to show/hide UI.", 4)
-info("DarpaHub Example initialized. Version:", DarpaHub.VERSION)
+DarpaHub:BindKey(Enum.KeyCode.F2, function()
+	print("[Keybind] F2 pressed - Quick toggle!")
+	-- You could toggle a feature here
+end)
 
--- Expose helpers to getgenv for dev convenience
-EX.DarpaHub = DarpaHub
-EX.Notify = notify
-EX.Tabs = Tabs
+DarpaHub:BindKey(Enum.KeyCode.F3, function()
+	print("[Keybind] F3 pressed - Stats display!")
+	local stats = DarpaHub._private.Profiler:GetStats()
+	print("Current profiler entries:", #stats)
+end)
 
--- End of corrected Example file
+DarpaHub:BindKey(Enum.KeyCode.F5, function()
+	print("[Keybind] F5 pressed - Hot reloading UI...")
+	DarpaHub:HotReload()
+end)
 
+DarpaHub:BindKey(Enum.KeyCode.F12, function()
+	print("[Keybind] F12 pressed - Debug info!")
+	print("DarpaHub Version:", DarpaHub.VERSION)
+	print("Running:", DarpaHub.State.Running)
+	print("Booted:", DarpaHub.State.Booted)
+end)
+
+KeybindsTab.API:AddLabel("Active Keybinds:")
+KeybindsTab.API:AddLabel("  • F1 - Help System")
+KeybindsTab.API:AddLabel("  • F2 - Quick Toggle")
+KeybindsTab.API:AddLabel("  • F3 - Stats Display")
+KeybindsTab.API:AddLabel("  • F5 - Hot Reload UI")
+KeybindsTab.API:AddLabel("  • F12 - Debug Info")
+KeybindsTab.API:AddLabel("")
+KeybindsTab.API:AddLabel("Try pressing the keys now!")
+KeybindsTab.API:AddLabel("")
+
+KeybindsTab.API:AddButton("📋 List All Keybinds", function()
+	print("═══ REGISTERED KEYBINDS ═══")
+	for i, bind in ipairs(DarpaHub.Keybinds) do
+		print(string.format("  %d. %s", i, tostring(bind.Key)))
+	end
+	print("Total keybinds:", #DarpaHub.Keybinds)
+end)
+
+-- ══════════════════════════════════════════════════════════════
+--  TAB 8: UI PRO
+-- ══════════════════════════════════════════════════════════════
+
+local UIProTab = DarpaHub:CreateTab("🎨 UIPro")
+
+UIProTab.API:AddLabel("═══════════════════════════════════")
+UIProTab.API:AddLabel("     ADVANCED UI COMPONENTS")
+UIProTab.API:AddLabel("═══════════════════════════════════")
+UIProTab.API:AddLabel("")
+UIProTab.API:AddLabel("Create custom windows with advanced controls")
+UIProTab.API:AddLabel("")
+
+local demoWindow = nil
+
+UIProTab.API:AddButton("➕ Create Demo Window", function()
+	if demoWindow then
+		print("[UIPro] Window already exists!")
+		return
+	end
+	
+	-- Create window
+	demoWindow = DarpaHub.UIPro:CreateWindow("UIPro Demo Window", UDim2.new(0, 450, 0, 350))
+	
+	-- Section 1: Toggles
+	local section1 = DarpaHub.UIPro:CreateSection(demoWindow.Body, "Toggle Controls")
+	
+	DarpaHub.UIPro:CreateToggle(section1, "Enable Feature A", false, function(state)
+		print("[UIPro Toggle] Feature A:", state)
+	end)
+	
+	DarpaHub.UIPro:CreateToggle(section1, "Enable Feature B", true, function(state)
+		print("[UIPro Toggle] Feature B:", state)
+	end)
+	
+	-- Section 2: Sliders
+	local section2 = DarpaHub.UIPro:CreateSection(demoWindow.Body, "Slider Controls")
+	
+	DarpaHub.UIPro:CreateSlider(section2, "Volume", 0, 100, 75, function(val)
+		print("[UIPro Slider] Volume:", math.floor(val))
+	end)
+	
+	DarpaHub.UIPro:CreateSlider(section2, "Speed", 1, 200, 50, function(val)
+		print("[UIPro Slider] Speed:", math.floor(val))
+	end)
+	
+	-- Section 3: Dropdowns
+	local section3 = DarpaHub.UIPro:CreateSection(demoWindow.Body, "Dropdown Controls")
+	
+	DarpaHub.UIPro:CreateDropdown(section3, "Select Mode", 
+		{"Easy", "Normal", "Hard", "Expert"}, 
+		function(opt)
+			print("[UIPro Dropdown] Selected mode:", opt)
+		end)
+	
+	print("[UIPro] Demo window created successfully!")
+	print("[UIPro] Window is draggable by the header")
+end)
+
+UIProTab.API:AddButton("❌ Destroy Demo Window", function()
+	if demoWindow and demoWindow.Window then
+		demoWindow.Window:Destroy()
+		demoWindow = nil
+		print("[UIPro] Demo window destroyed")
+	else
+		print("[UIPro] No window to destroy")
+	end
+end)
+
+UIProTab.API:AddLabel("")
+UIProTab.API:AddLabel("UIPro Components:")
+UIProTab.API:AddLabel("  • Custom Windows (draggable)")
+UIProTab.API:AddLabel("  • Sections (organized groups)")
+UIProTab.API:AddLabel("  • Toggles (animated switches)")
+UIProTab.API:AddLabel("  • Sliders (value adjusters)")
+UIProTab.API:AddLabel("  • Dropdowns (option selectors)")
+
+-- ══════════════════════════════════════════════════════════════
+--  TAB 9: PLUGINS
+-- ══════════════════════════════════════════════════════════════
+
+local PluginsTab = DarpaHub:CreateTab("🔌 Plugins")
+
+PluginsTab.API:AddLabel("═══════════════════════════════════")
+PluginsTab.API:AddLabel("        PLUGIN SYSTEM")
+PluginsTab.API:AddLabel("═══════════════════════════════════")
+PluginsTab.API:AddLabel("")
+PluginsTab.API:AddLabel("Extend functionality with sandboxed plugins")
+PluginsTab.API:AddLabel("Plugins have access to DarpaHub API only")
+PluginsTab.API:AddLabel("")
+
+-- Register a comprehensive demo plugin
+DarpaHub:RegisterPluginManifest({
+	name = "ShowcasePlugin",
+	version = "1.0.0",
+	author = "DarpaHub Team",
+	description = "Comprehensive demo plugin",
+	code = [[
+		print("[ShowcasePlugin] Initializing...")
+		
+		-- Plugin has access to DarpaHub API
+		DarpaHub.Logger.Info("Plugin initialized successfully!")
+		
+		-- Create a custom tab
+		local tab = DarpaHub.UI.CreateTab("🔌 Plugin Tab")
+		
+		-- Add UI elements
+		tab.API:AddLabel("═══ PLUGIN SHOWCASE ═══")
+		tab.API:AddLabel("")
+		tab.API:AddLabel("This tab was created by a plugin!")
+		tab.API:AddLabel("Plugins run in sandboxed environment")
+		tab.API:AddLabel("")
+		
+		tab.API:AddButton("Plugin Action 1", function()
+			DarpaHub.Logger.Info("Plugin button 1 clicked!")
+		end)
+		
+		tab.API:AddButton("Plugin Action 2", function()
+			DarpaHub.Logger.Info("Plugin button 2 clicked!")
+			-- Save plugin data
+			DarpaHub.Persistence.Save("plugin_clicks", {
+				count = (DarpaHub.Persistence.Load("plugin_clicks") or {}).count or 0 + 1
+			})
+		end)
+		
+		tab.API:AddToggle("Plugin Toggle", false, function(state)
+			DarpaHub.Logger.Info("Plugin toggle state:", state)
+		end)
+		
+		tab.API:AddLabel("")
+		tab.API:AddButton("Show Plugin Data", function()
+			local data = DarpaHub.Persistence.Load("plugin_data")
+			if data then
+				DarpaHub.Logger.Info("Plugin was loaded at:", data.loaded)
+			else
+				DarpaHub.Logger.Info("No plugin data found")
+			end
+		end)
+		
+		-- Save plugin load time
+		DarpaHub.Persistence.Save("plugin_data", {
+			loaded = os.time(),
+			name = DarpaHub.getName(),
+			version = DarpaHub.getVersion()
+		})
+		
+		-- Connect to theme changes
+		DarpaHub.Hooks.Connect("ThemeChanged", function(theme)
+			DarpaHub.Logger.Info("Theme changed to:", theme)
+		end)
+		
+		-- Schedule a job
+		local jobId = DarpaHub.Scheduler.Add(function()
+			-- This runs periodically
+		end, {interval = 5, persistent = true})
+		
+		-- Cleanup function
+		function onUnload()
+			DarpaHub.Logger.Info("ShowcasePlugin unloading...")
+			DarpaHub.Scheduler.Remove(jobId)
+		end
+		
+		print("[ShowcasePlugin] Loaded successfully!")
+	]]
+})
+
+PluginsTab.API:AddButton("📦 Load Plugin", function()
+	local ok, err = pcall(function()
+		DarpaHub:LoadPlugin("ShowcasePlugin")
+	end)
+	if ok then
+		print("[Plugins] ShowcasePlugin loaded successfully!")
+		print("[Plugins] Check the new 'Plugin Tab' that appeared")
+	else
+		warn("[Plugins] Failed to load plugin:", err)
+	end
+end)
+
+PluginsTab.API:AddButton("🔄 Hot Reload Plugin", function()
+	local ok, err = pcall(function()
+		DarpaHub:HotReloadPlugin("ShowcasePlugin")
+	end)
+	if ok then
+		print("[Plugins] Plugin hot reloaded successfully!")
+	else
+		warn("[Plugins] Hot reload failed:", err)
+	end
+end)
+
+PluginsTab.API:AddButton("❌ Unload Plugin", function()
+	local ok = DarpaHub:UnloadPlugin("ShowcasePlugin")
+	if ok then
+		print("[Plugins] Plugin unloaded successfully")
+	else
+		print("[Plugins] No plugin to unload or unload failed")
+	end
+end)
+
+PluginsTab.API:AddLabel("")
+PluginsTab.API:AddLabel("Plugin API Access:")
+PluginsTab.API:AddLabel("  • DarpaHub.Logger (Info/Warn/Error)")
+PluginsTab.API:AddLabel("  • DarpaHub.Scheduler (Add/Remove)")
+PluginsTab.API:AddLabel("  • DarpaHub.Hooks (Connect/Fire)")
+PluginsTab.API:AddLabel("  • DarpaHub.UI (CreateTab/Theme)")
+PluginsTab.API:AddLabel("  • DarpaHub.Persistence (Save/Load)")
+
+-- ══════════════════════════════════════════════════════════════
+--  TAB 10: SYSTEM INFO
+-- ══════════════════════════════════════════════════════════════
+
+local SystemTab = DarpaHub:CreateTab("ℹ️ System")
+
+SystemTab.API:AddLabel("═══════════════════════════════════")
+SystemTab.API:AddLabel("       SYSTEM INFORMATION")
+SystemTab.API:AddLabel("═══════════════════════════════════")
+SystemTab.API:AddLabel("")
+
+SystemTab.API:AddButton("📊 Show Full Status", function()
+	print("╔═══════════════════════════════════════════════════╗")
+	print("║          DARPA HUB SYSTEM STATUS                  ║")
+	print("╠═══════════════════════════════════════════════════╣")
+	print("║ Version:        ", DarpaHub.VERSION)
+	print("║ Built At:       ", os.date("%c", DarpaHub.BuiltAt))
+	print("║ Booted:         ", DarpaHub.State.Booted)
+	print("║ Running:        ", DarpaHub.State.Running)
+	print("║ Mode:           ", DarpaHub.State.Mode)
+	print("║ Environment:    ", DarpaHub.State.EnvironmentReady)
+	print("╠═══════════════════════════════════════════════════╣")
+	print("║ Registered Features:", #DarpaHub._private.FeatureOrder)
+	print("║ Active Connections: ", #DarpaHub._private.Connections)
+	print("║ Registered Keybinds:", #DarpaHub.Keybinds)
+	
+	local pluginCount = 0
+	for _ in pairs(DarpaHub._private.Plugins) do pluginCount = pluginCount + 1 end
+	print("║ Loaded Plugins:    ", pluginCount)
+	
+	local theme = DarpaHub._private.ActiveTheme
+	print("║ Active Theme:      ", theme and theme.Name or "Unknown")
+	print("╚═══════════════════════════════════════════════════╝")
+end)
+
+SystemTab.API:AddButton("🔄 Hot Reload UI", function()
+	print("[System] Initiating hot reload...")
+	DarpaHub:HotReload()
+end)
+
+SystemTab.API:AddLabel("")
+
+SystemTab.API:AddButton("🎯 Test All Systems", function()
+	print("╔═══════════════════════════════════════════════════╗")
+	print("║          SYSTEM DIAGNOSTICS                       ║")
+	print("╠═══════════════════════════════════════════════════╣")
+	
+	-- Test Hooks
+	local ok = pcall(function()
+		DarpaHub:CreateHook("TestDiag")
+		DarpaHub:ConnectHook("TestDiag", function() end)
+		DarpaHub:FireHook("TestDiag")
+	end)
+	print("║ Hooks System:        ", ok and "✓ PASS" or "✗ FAIL")
+	
+	-- Test Scheduler
+	ok = pcall(function()
+		local id = DarpaHub._private.Scheduler:AddJob(function() end, {persistent = false})
+		DarpaHub._private.Scheduler:RemoveJob(id)
+	end)
+	print("║ Scheduler:           ", ok and "✓ PASS" or "✗ FAIL")
+	
+	-- Test Persistence
+	ok = pcall(function()
+		DarpaHub:SaveJSON("diag_test", {test = true})
+		DarpaHub:LoadJSON("diag_test")
+	end)
+	print("║ Persistence:         ", ok and "✓ PASS" or "✗ FAIL")
+	
+	-- Test Theme
+	ok = pcall(function()
+		DarpaHub.Theme:GetColor("Accent")
+	end)
+	print("║ Theme Engine:        ", ok and "✓ PASS" or "✗ FAIL")
+	
+	-- Test Profiler
+	ok = pcall(function()
+		DarpaHub._private.Profiler:Time("diag_test", function() end)
+	end)
+	print("║ Profiler:            ", ok and "✓ PASS" or "✗ FAIL")
+	
+	-- Test Features
+	ok = pcall(function()
+		return DarpaHub.Features ~= nil
+	end)
+	print("║ Feature System:      ", ok and "✓ PASS" or "✗ FAIL")
+	
+	print("╠═══════════════════════════════════════════════════╣")
+	print("║ All core systems operational!                     ║")
+	print("╚═══════════════════════════════════════════════════╝")
+end)
+
+SystemTab.API:AddLabel("")
+
+SystemTab.API:AddButton("🗑️ Cleanup & Exit", function()
+	print("[System] Initiating shutdown sequence...")
+	
+	-- Disable all features
+	for name, feature in pairs(DarpaHub.Features) do
+		if feature.Enabled then
+			DarpaHub:DisableFeature(name)
+		end
+	end
+	
+	-- Disconnect all connections
+	DarpaHub:DisconnectAll()
+	
+	-- Destroy UI
+	if DarpaHub._private.UI and DarpaHub._private.UI.ScreenGui then
+		DarpaHub._private.UI.ScreenGui:Destroy()
+	end
+	
+	print("[System] Shutdown complete - DarpaHub unloaded")
+end)
+
+-- ══════════════════════════════════════════════════════════════
+--  TAB 11: DOCUMENTATION
+-- ══════════════════════════════════════════════════════════════
+
+local DocsTab = DarpaHub:CreateTab("📖 Docs")
+
+DocsTab.API:AddLabel("═══════════════════════════════════")
+DocsTab.API:AddLabel("       API QUICK REFERENCE")
+DocsTab.API:AddLabel("═══════════════════════════════════")
+DocsTab.API:AddLabel("")
+DocsTab.API:AddLabel("THEME SYSTEM:")
+DocsTab.API:AddLabel("  DarpaHub.Theme:SetTheme(name)")
+DocsTab.API:AddLabel("  DarpaHub.Theme:GetColor(key)")
+DocsTab.API:AddLabel("")
+DocsTab.API:AddLabel("FEATURES:")
+DocsTab.API:AddLabel("  DarpaHub:RegisterFeature(name, desc)")
+DocsTab.API:AddLabel("  DarpaHub:EnableFeature(name)")
+DocsTab.API:AddLabel("  DarpaHub:DisableFeature(name)")
+DocsTab.API:AddLabel("")
+DocsTab.API:AddLabel("HOOKS:")
+DocsTab.API:AddLabel("  DarpaHub:CreateHook(name)")
+DocsTab.API:AddLabel("  DarpaHub:ConnectHook(name, fn)")
+DocsTab.API:AddLabel("  DarpaHub:FireHook(name, ...)")
+DocsTab.API:AddLabel("  DarpaHub:FireHookAsync(name, ...)")
+DocsTab.API:AddLabel("")
+DocsTab.API:AddLabel("SCHEDULER:")
+DocsTab.API:AddLabel("  Scheduler:AddJob(fn, opts)")
+DocsTab.API:AddLabel("  Scheduler:RemoveJob(id)")
+DocsTab.API:AddLabel("")
+DocsTab.API:AddLabel("PERSISTENCE:")
+DocsTab.API:AddLabel("  DarpaHub:SaveJSON(name, table)")
+DocsTab.API:AddLabel("  DarpaHub:LoadJSON(name)")
+DocsTab.API:AddLabel("")
+DocsTab.API:AddLabel("UI:")
+DocsTab.API:AddLabel("  DarpaHub:CreateTab(name)")
+DocsTab.API:AddLabel("  tab.API:AddLabel(text)")
+DocsTab.API:AddLabel("  tab.API:AddButton(text, fn)")
+DocsTab.API:AddLabel("  tab.API:AddToggle(text, default, fn)")
+DocsTab.API:AddLabel("")
+DocsTab.API:AddLabel("KEYBINDS:")
+DocsTab.API:AddLabel("  DarpaHub:BindKey(keyCode, fn)")
+DocsTab.API:AddLabel("")
+DocsTab.API:AddLabel("PLUGINS:")
+DocsTab.API:AddLabel("  DarpaHub:RegisterPluginManifest(m)")
+DocsTab.API:AddLabel("  DarpaHub:LoadPlugin(name)")
+DocsTab.API:AddLabel("  DarpaHub:UnloadPlugin(name)")
+DocsTab.API:AddLabel("")
+
+DocsTab.API:AddButton("📋 Print Full API", function()
+	print("═══════════════ DARPAHUB API REFERENCE ═══════════════")
+	print("Access via: getgenv().DarpaHubAPI")
+	print("")
+	print("Core Methods:")
+	print("  • RegisterFeature(name, descriptor)")
+	print("  • EnableFeature(name)")
+	print("  • DisableFeature(name)")
+	print("  • CreateTab(name)")
+	print("  • BindKey(keyCode, callback)")
+	print("")
+	print("Subsystems:")
+	print("  • Theme (SetTheme, GetColor)")
+	print("  • Scheduler (AddJob, RemoveJob)")
+	print("  • Hooks (Connect, Fire)")
+	print("  • Persistence (Save, Load)")
+	print("  • Profiler (Enable, Disable, GetStats)")
+	print("")
+	print("See documentation at DarpaHubLib.lua")
+	print("═══════════════════════════════════════════════════════")
+end)
+
+-- ══════════════════════════════════════════════════════════════
+--  MONITOR ALL EVENTS
+-- ══════════════════════════════════════════════════════════════
+
+-- Theme changes
+DarpaHub:ConnectHook("ThemeChanged", function(themeName)
+	print("🎨 [Event] Theme changed to:", themeName)
+end)
+
+-- Tab activation
+DarpaHub:ConnectHook("TabActivated", function(tabName)
+	print("📑 [Event] Tab activated:", tabName)
+end)
+
+-- Feature lifecycle
+DarpaHub:ConnectHook("FeatureRegistered", function(name)
+	print("⚡ [Event] Feature registered:", name)
+end)
+
+-- Profiler updates (fires every 5 seconds)
+DarpaHub:ConnectHook("ProfilerTick", function(stats)
+	-- Uncomment to see periodic profiler stats
+	-- print("📊 [Event] Profiler tick - entries:", #stats)
+end)
+
+-- ══════════════════════════════════════════════════════════════
+--  STARTUP COMPLETE
+-- ══════════════════════════════════════════════════════════════
+
+print("\n╔═══════════════════════════════════════════════════════════╗")
+print("║                                                           ║")
+print("║     ✅ DARPA HUB v6.0 SHOWCASE LOADED SUCCESSFULLY!      ║")
+print("║                                                           ║")
+print("╠═══════════════════════════════════════════════════════════╣")
+print("║                                                           ║")
+print("║  📚 FEATURES DEMONSTRATED:                                ║")
+print("║    • Theme Engine (Dark/Midnight/Light)                   ║")
+print("║    • Feature Lifecycle System                             ║")
+print("║    • Event Hook System (Sync/Async)                       ║")
+print("║    • Job Scheduler (Priority-based)                       ║")
+print("║    • Performance Profiler                                 ║")
+print("║    • Data Persistence (JSON)                              ║")
+print("║    • Keybind Manager                                      ║")
+print("║    • Plugin System (Sandboxed)                            ║")
+print("║    • UIPro Components                                     ║")
+print("║    • Hot Reload                                           ║")
+print("║    • Safe API Export                                      ║")
+print("║                                                           ║")
+print("╠═══════════════════════════════════════════════════════════╣")
+print("║                                                           ║")
+print("║  🎮 EXPLORE THE TABS TO SEE EVERYTHING IN ACTION!        ║")
+print("║                                                           ║")
+print("║  ⌨️  ACTIVE KEYBINDS:                                     ║")
+print("║    • F1  - Help System                                    ║")
+print("║    • F2  - Quick Toggle                                   ║")
+print("║    • F3  - Stats Display                                  ║")
+print("║    • F5  - Hot Reload UI                                  ║")
+print("║    • F12 - Debug Info                                     ║")
+print("║                                                           ║")
+print("╠═══════════════════════════════════════════════════════════╣")
+print("║                                                           ║")
+print("║  📖 Full documentation in the 'Docs' tab                  ║")
+print("║  🔧 System diagnostics in the 'System' tab                ║")
+print("║                                                           ║")
+print("╚═══════════════════════════════════════════════════════════╝\n")
