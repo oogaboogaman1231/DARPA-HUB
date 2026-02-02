@@ -1043,4 +1043,169 @@ end
 DarpaHub:GetSafeAPI().Render = DarpaHub.Render
 getgenv().DarpaHubRender = DarpaHub.Render
 
+-- ===============================
+-- ADVANCED VISIBILITY & OCCLUSION
+-- ===============================
+
+DarpaHub.Render.Visibility = {}
+
+local RayParams = RaycastParams.new()
+RayParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+function DarpaHub.Render.Visibility:IsVisible(origin, target, ignore)
+    RayParams.FilterDescendantsInstances = ignore or {}
+    local dir = (target - origin)
+    local res = workspace:Raycast(origin, dir, RayParams)
+    if not res then return true end
+    return (res.Position - origin).Magnitude + 0.1 >= dir.Magnitude
+end
+
+-- ===============================
+-- ENTITY REGISTRY
+-- ===============================
+
+DarpaHub.Render.Entities = {}
+
+function DarpaHub.Render:RegisterEntity(id, rootPart, config)
+    self.Entities[id] = {
+        Root = rootPart,
+        Config = config or {},
+        Objects = {},
+        Alive = true
+    }
+end
+
+function DarpaHub.Render:RemoveEntity(id)
+    local e = self.Entities[id]
+    if not e then return end
+    for _, obj in pairs(e.Objects) do
+        obj:Destroy()
+    end
+    self.Entities[id] = nil
+end
+
+-- ===============================
+-- 3D BOUNDING BOX PROJECTOR
+-- ===============================
+
+function DarpaHub.Render:ProjectBoundingBox(cf, size)
+    local corners = {
+        cf * Vector3.new(-size.X, -size.Y, -size.Z)/2,
+        cf * Vector3.new( size.X, -size.Y, -size.Z)/2,
+        cf * Vector3.new(-size.X,  size.Y, -size.Z)/2,
+        cf * Vector3.new( size.X,  size.Y, -size.Z)/2,
+        cf * Vector3.new(-size.X, -size.Y,  size.Z)/2,
+        cf * Vector3.new( size.X, -size.Y,  size.Z)/2,
+        cf * Vector3.new(-size.X,  size.Y,  size.Z)/2,
+        cf * Vector3.new( size.X,  size.Y,  size.Z)/2
+    }
+
+    local minX, minY = math.huge, math.huge
+    local maxX, maxY = -math.huge, -math.huge
+    local visible = false
+
+    for _, c in ipairs(corners) do
+        local p, on = self:WorldToScreen(c)
+        if on then
+            visible = true
+            minX = math.min(minX, p.X)
+            minY = math.min(minY, p.Y)
+            maxX = math.max(maxX, p.X)
+            maxY = math.max(maxY, p.Y)
+        end
+    end
+
+    if not visible then return nil end
+    return Vector2.new(minX, minY), Vector2.new(maxX - minX, maxY - minY)
+end
+
+-- ===============================
+-- HEALTHBAR SYSTEM
+-- ===============================
+
+function DarpaHub.Render:AttachHealthbar(entityId, humanoid)
+    local barBg = self:CreateSquare()
+    local barFill = self:CreateSquare()
+
+    barBg.Draw.Filled = true
+    barFill.Draw.Filled = true
+
+    barBg.Draw.Color = Color3.fromRGB(25,25,25)
+
+    self.Entities[entityId].Objects.HealthBG = barBg
+    self.Entities[entityId].Objects.HealthFill = barFill
+
+    self._private.Scheduler:AddJob(function()
+        if not humanoid or humanoid.Health <= 0 then return end
+        local hp = humanoid.Health / humanoid.MaxHealth
+        barFill.Draw.Color = Color3.fromRGB(255 - 200*hp, 200*hp, 60)
+        barFill.Percent = hp
+    end,{interval=0.05})
+end
+
+-- ===============================
+-- OFFSCREEN ARROWS
+-- ===============================
+
+function DarpaHub.Render:CreateArrow()
+    local t = self:CreateTriangle or self:CreateLine
+    return t and t() or self:CreateLine()
+end
+
+-- ===============================
+-- SMART ENTITY UPDATE LOOP
+-- ===============================
+
+DarpaHub._private.Scheduler:AddJob(function()
+    local cam = workspace.CurrentCamera
+    local camPos = cam.CFrame.Position
+
+    for id, ent in pairs(DarpaHub.Render.Entities) do
+        if ent.Root and ent.Root.Parent then
+            local pos = ent.Root.Position
+            local dist = (camPos - pos).Magnitude
+
+            local visible = DarpaHub.Render.Visibility:IsVisible(camPos, pos, {ent.Root.Parent})
+
+            if visible then
+                if ent.Config.Box then
+                    local box = ent.Objects.Box or DarpaHub.Render:CreateBox()
+                    ent.Objects.Box = box
+                    local p, s = DarpaHub.Render:ProjectBoundingBox(ent.Root.CFrame, ent.Root.Size*1.3)
+                    if p then
+                        box.Draw.Position = p
+                        box.Draw.Size = s
+                        box.Draw.Visible = true
+                    end
+                end
+            else
+                for _, obj in pairs(ent.Objects) do
+                    obj:Hide()
+                end
+            end
+        end
+    end
+end,{interval=0})
+
+-- ===============================
+-- DISTANCE FADING
+-- ===============================
+
+function DarpaHub.Render:ApplyFade(obj, dist)
+    local max = self.Settings.MaxDistance
+    local alpha = 1 - math.clamp(dist / max, 0, 1)
+    if obj.Draw then
+        obj.Draw.Transparency = 1 - alpha
+    end
+end
+
+-- ===============================
+-- ADVANCED CLEANUP
+-- ===============================
+
+function DarpaHub.Render:Wipe()
+    self:Clear()
+    self.Entities = {}
+end
+
 return DarpaHub
