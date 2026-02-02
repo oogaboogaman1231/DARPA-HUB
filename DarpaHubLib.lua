@@ -4,7 +4,7 @@
 -- Profiler, Hook Engine (sync/async), Keybind Manager, Persistence, Safe API Export (getgenv).
 -- Important: This library purposefully contains NO gameplay-cheat implementations or demo features.
 -- Author: DarpaHub Team (production)
--- Version: 2.0.0-production
+-- Version: 6.0.0-production
 
 -- ===============
 -- ENVIRONMENT SETUP
@@ -2302,3 +2302,4 @@ getgenv().DarpaHubUIPro = DarpaHub.UIPro
 
 
 return DarpaHub
+
