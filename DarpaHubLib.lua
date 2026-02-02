@@ -1208,4 +1208,129 @@ function DarpaHub.Render:Wipe()
     self.Entities = {}
 end
 
+-- ===============================
+-- DARPAHUB ADVANCED VISIBILITY CHECK
+-- ===============================
+
+DarpaHub.Render.VisibilityCheck = {}
+
+local Visibility = DarpaHub.Render.VisibilityCheck
+
+local RayParamsFast = RaycastParams.new()
+RayParamsFast.FilterType = Enum.RaycastFilterType.Blacklist
+
+local RayParamsAccurate = RaycastParams.new()
+RayParamsAccurate.FilterType = Enum.RaycastFilterType.Blacklist
+RayParamsAccurate.IgnoreWater = true
+
+-- ===============================
+-- INTERNAL CAST
+-- ===============================
+
+local function cast(origin, target, ignore, params)
+    params.FilterDescendantsInstances = ignore or {}
+    local dir = target - origin
+    local result = workspace:Raycast(origin, dir, params)
+
+    if not result then
+        return true, nil
+    end
+
+    local hitDist = (result.Position - origin).Magnitude
+    if hitDist + 0.05 >= dir.Magnitude then
+        return true, result
+    end
+
+    return false, result
+end
+
+-- ===============================
+-- FAST CHECK (cheap, high FPS safe)
+-- ===============================
+
+function Visibility:Fast(origin, target, ignoreList)
+    return cast(origin, target, ignoreList, RayParamsFast)
+end
+
+-- ===============================
+-- ACCURATE CHECK (multi sample rays)
+-- better for aimbot / precise ESP
+-- ===============================
+
+function Visibility:Accurate(origin, target, ignoreList)
+    local visible, hit = cast(origin, target, ignoreList, RayParamsAccurate)
+    if not visible then return false, hit end
+
+    -- multi offset rays (reduces corner wall clipping)
+    local offsets = {
+        Vector3.new(0, 0.2, 0),
+        Vector3.new(0, -0.2, 0),
+        Vector3.new(0.15, 0, 0),
+        Vector3.new(-0.15, 0, 0),
+    }
+
+    for _, off in ipairs(offsets) do
+        local ok = cast(origin + off, target, ignoreList, RayParamsAccurate)
+        if not ok then
+            return false, hit
+        end
+    end
+
+    return true, hit
+end
+
+-- ===============================
+-- CAMERA TO ENTITY CHECK
+-- ===============================
+
+function Visibility:FromCamera(worldPos, ignore)
+    local cam = workspace.CurrentCamera
+    if not cam then return false end
+    return self:Fast(cam.CFrame.Position, worldPos, ignore)
+end
+
+-- ===============================
+-- HUMANOID ROOTPART HELPER
+-- ===============================
+
+function Visibility:CharacterVisible(character, ignoreExtra)
+    if not character then return false end
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+
+    local ignore = {character}
+    if ignoreExtra then
+        for _, v in ipairs(ignoreExtra) do
+            table.insert(ignore, v)
+        end
+    end
+
+    return self:Accurate(
+        workspace.CurrentCamera.CFrame.Position,
+        root.Position,
+        ignore
+    )
+end
+
+-- ===============================
+-- DISTANCE + VISIBILITY COMBO
+-- ===============================
+
+function Visibility:VisibleAndInRange(origin, target, maxDistance, ignore)
+    local dist = (origin - target).Magnitude
+    if maxDistance and dist > maxDistance then
+        return false, dist
+    end
+
+    local vis = self:Fast(origin, target, ignore)
+    return vis, dist
+end
+
+-- ===============================
+-- SAFE EXPORT
+-- ===============================
+
+DarpaHub:GetSafeAPI().Visibility = Visibility
+getgenv().DarpaHubVisibility = Visibility
+
 return DarpaHub
