@@ -23,7 +23,7 @@ local AimbotModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/
 local ESPModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/oogaboogaman1231/DARPA-HUB/refs/heads/main/DarpaHub_ESP.lua"))()
 
 -- Inicializar módulos
-Aimbot Module:Init()
+AimbotModule:Init()
 ESPModule:Init()
 
 -- ═══════════════════════════════════════════════════════════
