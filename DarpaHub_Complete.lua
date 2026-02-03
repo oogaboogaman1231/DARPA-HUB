@@ -16,11 +16,11 @@
 ]]
 
 -- Carregar biblioteca principal (coloque o código da biblioteca aqui ou carregue de URL)
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/seu-repo/DarpaHubUI.lua"))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/oogaboogaman1231/DARPA-HUB/refs/heads/main/DarpaHubUI.lua"))()
 
 -- Carregar módulos
-local AimbotModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/seu-repo/DarpaHub_Aimbot.lua"))()
-local ESPModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/seu-repo/DarpaHub_ESP.lua"))()
+local AimbotModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/oogaboogaman1231/DARPA-HUB/refs/heads/main/DarpaHub_Aimbot.lua"))()
+local ESPModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/oogaboogaman1231/DARPA-HUB/refs/heads/main/DarpaHub_ESP.lua"))()
 
 -- Inicializar módulos
 Aimbot Module:Init()
