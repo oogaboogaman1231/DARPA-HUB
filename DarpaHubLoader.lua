@@ -22,7 +22,7 @@ local DEFUSE_DIVISION_ID = 112757576021097
 
 local URL_BLOXSTRIKE  = "https://your-link-here.com/bloxstrike.lua"
 local URL_DEFUSE      = "https://your-link-here.com/defusedivision.lua"
-local URL_UNSUPPORTED = "https://raw.githubusercontent.com/oogaboogaman1231/DARPA-HUB/refs/heads/main/DarpaHubExample.lua"
+local URL_UNSUPPORTED = "https://raw.githubusercontent.com/oogaboogaman1231/DARPA-HUB/refs/heads/main/DarpaHub_Complete.lua"
 
 local SOUND_ID     = "rbxassetid://124534526449303"  -- set to nil to disable sound
 local OPEN_TIME    = 0.65
@@ -752,4 +752,5 @@ end)
 if not loadBlockOk then
 	warn("DarpaHub: load block error —", tostring(loadBlockErr))
 	fireHook("onLoadFail", tostring(loadBlockErr))
+
 end
