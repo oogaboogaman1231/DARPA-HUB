@@ -23,7 +23,7 @@
 ## 🎯 Instalação Rápida
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/seu-repo/DarpaHub_Complete.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/oogaboogaman1231/DARPA-HUB/refs/heads/main/DarpaHubLoader.lua"))()
 ```
 
 ---
