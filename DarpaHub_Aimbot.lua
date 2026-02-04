@@ -90,12 +90,14 @@ local function IsVisible(player, part)
     
     local origin = Camera.CFrame.Position
     local direction = (part.Position - origin).Unit * 500
-    local ray = Ray.new(origin, direction)
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {Player.Character, Camera}
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
     
-    local hit = workspace:FindPartOnRayWithIgnoreList(ray, {Player.Character, Camera})
+    local result = workspace:Raycast(origin, direction, rayParams)
     
-    if hit then
-        return hit:IsDescendantOf(player.Character)
+    if result and result.Instance then
+        return result.Instance:IsDescendantOf(player.Character)
     end
     
     return false
@@ -145,33 +147,41 @@ end
 local function InitFOVCircle()
     if not Drawing then return end
     
-    FOVCircle = Drawing.new("Circle")
-    FOVCircle.Visible = false
-    FOVCircle.Radius = AimbotModule.FOV.Radius
-    FOVCircle.Color = AimbotModule.FOV.Color
-    FOVCircle.Transparency = AimbotModule.FOV.Transparency
-    FOVCircle.Thickness = AimbotModule.FOV.Thickness
-    FOVCircle.NumSides = AimbotModule.FOV.Sides
-    FOVCircle.Filled = AimbotModule.FOV.Filled
+    local success, err = pcall(function()
+        FOVCircle = Drawing.new("Circle")
+        FOVCircle.Visible = false
+        FOVCircle.Radius = AimbotModule.FOV.Radius
+        FOVCircle.Color = AimbotModule.FOV.Color
+        FOVCircle.Transparency = AimbotModule.FOV.Transparency
+        FOVCircle.Thickness = AimbotModule.FOV.Thickness
+        FOVCircle.NumSides = AimbotModule.FOV.Sides
+        FOVCircle.Filled = AimbotModule.FOV.Filled
+    end)
+    
+    if not success then
+        FOVCircle = nil
+    end
 end
 
 local function UpdateFOVCircle()
     if not FOVCircle then return end
     
-    if AimbotModule.FOV.Visible and AimbotModule.Settings.Enabled then
-        local mousePos = GetMousePosition()
-        
-        FOVCircle.Position = mousePos
-        FOVCircle.Radius = AimbotModule.FOV.Radius
-        FOVCircle.Color = Locked and AimbotModule.FOV.LockedColor or AimbotModule.FOV.Color
-        FOVCircle.Transparency = AimbotModule.FOV.Transparency
-        FOVCircle.Thickness = AimbotModule.FOV.Thickness
-        FOVCircle.NumSides = AimbotModule.FOV.Sides
-        FOVCircle.Filled = AimbotModule.FOV.Filled
-        FOVCircle.Visible = true
-    else
-        FOVCircle.Visible = false
-    end
+    pcall(function()
+        if AimbotModule.FOV.Visible and AimbotModule.Settings.Enabled then
+            local mousePos = GetMousePosition()
+            
+            FOVCircle.Position = mousePos
+            FOVCircle.Radius = AimbotModule.FOV.Radius
+            FOVCircle.Color = Locked and AimbotModule.FOV.LockedColor or AimbotModule.FOV.Color
+            FOVCircle.Transparency = AimbotModule.FOV.Transparency
+            FOVCircle.Thickness = AimbotModule.FOV.Thickness
+            FOVCircle.NumSides = AimbotModule.FOV.Sides
+            FOVCircle.Filled = AimbotModule.FOV.Filled
+            FOVCircle.Visible = true
+        else
+            FOVCircle.Visible = false
+        end
+    end)
 end
 
 -- ═══════════════════════════════════════════════════════════
@@ -228,34 +238,36 @@ end
 local function AimAt(targetPart)
     if not targetPart then return end
     
-    local targetPos = AimbotModule.Settings.PredictionEnabled and 
-                     PredictPosition(targetPart, AimbotModule.Settings.PredictionAmount) or 
-                     targetPart.Position
-    
-    if AimbotModule.Settings.ThirdPerson and mousemoverel then
-        -- Third Person Aiming (mouse movement)
-        local screenPos, onScreen = WorldToScreen(targetPos)
-        if not onScreen then return end
+    pcall(function()
+        local targetPos = AimbotModule.Settings.PredictionEnabled and 
+                         PredictPosition(targetPart, AimbotModule.Settings.PredictionAmount) or 
+                         targetPart.Position
         
-        local mousePos = GetMousePosition()
-        local delta = (screenPos - mousePos) * AimbotModule.Settings.ThirdPersonSensitivity
-        
-        mousemoverel(delta.X, delta.Y)
-    else
-        -- First Person Aiming (camera CFrame)
-        local targetCFrame = CFrame.new(Camera.CFrame.Position, targetPos)
-        
-        if AimbotModule.Settings.Smoothing > 0 then
-            local tween = TweenService:Create(
-                Camera,
-                TweenInfo.new(AimbotModule.Settings.Smoothing, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-                {CFrame = targetCFrame}
-            )
-            tween:Play()
+        if AimbotModule.Settings.ThirdPerson and mousemoverel then
+            -- Third Person Aiming (mouse movement)
+            local screenPos, onScreen = WorldToScreen(targetPos)
+            if not onScreen then return end
+            
+            local mousePos = GetMousePosition()
+            local delta = (screenPos - mousePos) * AimbotModule.Settings.ThirdPersonSensitivity
+            
+            mousemoverel(delta.X, delta.Y)
         else
-            Camera.CFrame = targetCFrame
+            -- First Person Aiming (camera CFrame)
+            local targetCFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+            
+            if AimbotModule.Settings.Smoothing > 0 then
+                local tween = TweenService:Create(
+                    Camera,
+                    TweenInfo.new(AimbotModule.Settings.Smoothing, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+                    {CFrame = targetCFrame}
+                )
+                tween:Play()
+            else
+                Camera.CFrame = targetCFrame
+            end
         end
-    end
+    end)
 end
 
 -- ═══════════════════════════════════════════════════════════
@@ -311,8 +323,10 @@ local function OnInputBegan(input, gameProcessed)
             Running = true
         end
         
-        if Running and getgenv().firehook then
-            getgenv().firehook("AimbotActivated")
+        if Running and getgenv and getgenv().firehook then
+            pcall(function()
+                getgenv().firehook("AimbotActivated")
+            end)
         end
     end
 end
@@ -326,8 +340,10 @@ local function OnInputEnded(input, gameProcessed)
             Running = false
             Locked = nil
             
-            if getgenv().firehook then
-                getgenv().firehook("AimbotDeactivated")
+            if getgenv and getgenv().firehook then
+                pcall(function()
+                    getgenv().firehook("AimbotDeactivated")
+                end)
             end
         end
     end
@@ -354,10 +370,10 @@ function AimbotModule:Init()
     Connections.InputBegan = UserInputService.InputBegan:Connect(OnInputBegan)
     Connections.InputEnded = UserInputService.InputEnded:Connect(OnInputEnded)
     
-    print("[DarpaHub Aimbot] Módulo inicializado")
-    
-    if getgenv().firehook then
-        getgenv().firehook("AimbotInitialized")
+    if getgenv and getgenv().firehook then
+        pcall(function()
+            getgenv().firehook("AimbotInitialized")
+        end)
     end
 end
 
@@ -370,13 +386,15 @@ function AimbotModule:Disable()
     end
     
     if FOVCircle then
-        FOVCircle:Remove()
+        pcall(function()
+            FOVCircle:Remove()
+        end)
     end
     
-    print("[DarpaHub Aimbot] Módulo desativado")
-    
-    if getgenv().firehook then
-        getgenv().firehook("AimbotDisabled")
+    if getgenv and getgenv().firehook then
+        pcall(function()
+            getgenv().firehook("AimbotDisabled")
+        end)
     end
 end
 
